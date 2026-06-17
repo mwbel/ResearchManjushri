@@ -1,0 +1,79 @@
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# Python 缓存
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# 虚拟环境
+.venv/
+venv/
+env/
+
+# Node / 前端依赖
+node_modules/
+dist/
+build/
+.next/
+.vite/
+
+# 本地环境变量与密钥
+.env
+.env.*
+*.pem
+*.key
+*.crt
+*.p12
+*.token
+secrets/
+credentials/
+
+# 日志和临时文件
+*.log
+logs/
+tmp/
+temp/
+.cache/
+
+# 大型数据、RAG、OCR、PDF、模型文件
+RAG/
+rag/
+data/
+datasets/
+outputs/
+ocr/
+chunks/
+merged/
+mathpix_rag_outputs*/
+*.pdf
+*.caj
+*.docx
+*.pptx
+*.xlsx
+*.zip
+*.tar
+*.gz
+
+# 模型与向量库
+models/
+checkpoints/
+*.bin
+*.pt
+*.pth
+*.onnx
+*.safetensors
+*.faiss
+*.index
+*.sqlite
+*.db
+
+# 备份
+*_backup/
+backup/
+versions/*/.local_rag
