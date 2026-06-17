@@ -1,0 +1,1140 @@
+{
+  "schema": "openai.presentation.layout/v4",
+  "unit": "px",
+  "slide": {
+    "aid": "sl/fdvqt8",
+    "id": "fdvqt8",
+    "slide": 7,
+    "layoutId": "5f6d402a-ba68-4690-bd24-be0551869de0",
+    "layoutName": "Title Slide",
+    "layoutType": "title",
+    "masterLayoutId": "74843bf0-8ed4-4fbc-b3de-0ec2ebeb8e6e",
+    "masterLayoutName": "Master",
+    "frame": {
+      "left": 0,
+      "top": 0,
+      "width": 1280,
+      "height": 720
+    }
+  },
+  "theme": {
+    "colorSchemeName": "ChatGPT",
+    "colors": {
+      "accent1": "#156082",
+      "accent2": "#E97132",
+      "accent3": "#196B24",
+      "accent4": "#0F9ED5",
+      "accent5": "#A02B93",
+      "accent6": "#4EA72E",
+      "bg1": "#FFFFFF",
+      "bg2": "#000000",
+      "tx1": "#1F1F1F",
+      "tx2": "#FFFFFF",
+      "dk1": "#000000",
+      "lt1": "#FFFFFF",
+      "dk2": "#0E2841",
+      "lt2": "#E8E8E8",
+      "hlink": "#467886",
+      "folHlink": "#96607D"
+    },
+    "typefaces": [
+      "Aptos"
+    ]
+  },
+  "inheritedLayers": [
+    {
+      "scope": "layout",
+      "id": "5f6d402a-ba68-4690-bd24-be0551869de0",
+      "name": "Title Slide",
+      "type": "title",
+      "parentLayoutId": "74843bf0-8ed4-4fbc-b3de-0ec2ebeb8e6e",
+      "elements": []
+    },
+    {
+      "scope": "master",
+      "id": "74843bf0-8ed4-4fbc-b3de-0ec2ebeb8e6e",
+      "name": "Master",
+      "type": "master",
+      "elements": []
+    }
+  ],
+  "elements": [
+    {
+      "order": 1,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/v6psfil0",
+      "id": "1",
+      "bbox": [
+        0,
+        0,
+        1280,
+        720
+      ],
+      "geometry": "rect",
+      "fillColor": "#FFFFFF",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 2,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/knih4byh",
+      "id": "2",
+      "bbox": [
+        0,
+        0,
+        1280,
+        16
+      ],
+      "geometry": "rect",
+      "fillColor": "#123B64",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 3,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/d8bat47y",
+      "id": "3",
+      "bbox": [
+        72,
+        42,
+        180,
+        24
+      ],
+      "geometry": "rect",
+      "text": "典型应用",
+      "textPreview": "典型应用",
+      "resolvedFontSize": 18,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 18,
+        "typeface": "Aptos",
+        "color": "#2F6E9E",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "典型应用"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "典型应用",
+          "resolvedTextStyle": {
+            "fontSize": 18,
+            "typeface": "Aptos",
+            "color": "#2F6E9E",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "典型应用",
+              "fontSize": 18,
+              "typeface": "Aptos",
+              "color": "#2F6E9E",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 4,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/29gr2p8n",
+      "id": "4",
+      "bbox": [
+        72,
+        78,
+        860,
+        54
+      ],
+      "geometry": "rect",
+      "text": "SVD 在哪些问题里真正发挥作用？",
+      "textPreview": "SVD 在哪些问题里真正发挥作用？",
+      "resolvedFontSize": 31,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 31,
+        "typeface": "Aptos",
+        "color": "#1E293B",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "SVD 在哪些问题里真正发挥作用？"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "SVD 在哪些问题里真正发挥作用？",
+          "resolvedTextStyle": {
+            "fontSize": 31,
+            "typeface": "Aptos",
+            "color": "#1E293B",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "SVD 在哪些问题里真正发挥作用？",
+              "fontSize": 31,
+              "typeface": "Aptos",
+              "color": "#1E293B",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 5,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/vu9knih4",
+      "id": "5",
+      "bbox": [
+        72,
+        130,
+        920,
+        30
+      ],
+      "geometry": "rect",
+      "text": "它既是理论分解工具，也是工程计算中的“万能中间层”。",
+      "textPreview": "它既是理论分解工具，也是工程计算中的“万能中间层”。",
+      "resolvedFontSize": 15,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 15,
+        "typeface": "Aptos",
+        "color": "#5B6573",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "它既是理论分解工具，也是工程计算中的“万能中间层”。"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "它既是理论分解工具，也是工程计算中的“万能中间层”。",
+          "resolvedTextStyle": {
+            "fontSize": 15,
+            "typeface": "Aptos",
+            "color": "#5B6573",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "它既是理论分解工具，也是工程计算中的“万能中间层”。",
+              "fontSize": 15,
+              "typeface": "Aptos",
+              "color": "#5B6573"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 6,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/kf6dcbul",
+      "id": "6",
+      "bbox": [
+        72,
+        171,
+        1136,
+        1.5
+      ],
+      "geometry": "rect",
+      "fillColor": "#D8E2EC",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 7,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/d0z61032",
+      "id": "7",
+      "bbox": [
+        72,
+        686,
+        260,
+        18
+      ],
+      "geometry": "rect",
+      "text": "Numerical Linear Algebra",
+      "textPreview": "Numerical Linear Algebra",
+      "resolvedFontSize": 11,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 11,
+        "typeface": "Aptos",
+        "color": "#5B6573",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Numerical Linear Algebra"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Numerical Linear Algebra",
+          "resolvedTextStyle": {
+            "fontSize": 11,
+            "typeface": "Aptos",
+            "color": "#5B6573",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Numerical Linear Algebra",
+              "fontSize": 11,
+              "typeface": "Aptos",
+              "color": "#5B6573"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 8,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/2x4nap4r",
+      "id": "8",
+      "bbox": [
+        1160,
+        682,
+        48,
+        18
+      ],
+      "geometry": "rect",
+      "text": "07",
+      "textPreview": "07",
+      "resolvedFontSize": 12,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 12,
+        "typeface": "Aptos",
+        "color": "#5B6573",
+        "alignment": "right",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "07"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "07",
+          "resolvedTextStyle": {
+            "fontSize": 12,
+            "typeface": "Aptos",
+            "color": "#5B6573",
+            "alignment": "right"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "07",
+              "fontSize": 12,
+              "typeface": "Aptos",
+              "color": "#5B6573"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 9,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/vixczed8",
+      "id": "9",
+      "bbox": [
+        88,
+        214,
+        344,
+        320
+      ],
+      "geometry": "rect",
+      "fillColor": "#FFFFFF",
+      "lineColor": "#D8E2EC",
+      "lineWidth": 1
+    },
+    {
+      "order": 10,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/vmtwra5g",
+      "id": "10",
+      "bbox": [
+        88,
+        214,
+        6,
+        320
+      ],
+      "geometry": "rect",
+      "fillColor": "#2F6E9E",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 11,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/61032lsz",
+      "id": "11",
+      "bbox": [
+        110,
+        232,
+        308,
+        26
+      ],
+      "geometry": "rect",
+      "text": "最小二乘与伪逆",
+      "textPreview": "最小二乘与伪逆",
+      "resolvedFontSize": 20,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 20,
+        "typeface": "Aptos",
+        "color": "#1E293B",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "最小二乘与伪逆"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "最小二乘与伪逆",
+          "resolvedTextStyle": {
+            "fontSize": 20,
+            "typeface": "Aptos",
+            "color": "#1E293B",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "最小二乘与伪逆",
+              "fontSize": 20,
+              "typeface": "Aptos",
+              "color": "#1E293B",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 12,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/dsji5sne",
+      "id": "12",
+      "bbox": [
+        110,
+        270,
+        304,
+        250
+      ],
+      "geometry": "rect",
+      "text": "对超定方程 Ax≈b，SVD 给出 Moore-Penrose 伪逆：\nA⁺ = VΣ⁺Uᵀ。\n\n于是最小二乘解 x*=A⁺b 能自然处理秩亏和病态情况。",
+      "textPreview": "对超定方程 Ax≈b，SVD 给出 Moore-Penrose 伪逆： | A⁺ = VΣ⁺Uᵀ。 |  | 于是最小二乘解 x*=A⁺b 能自然处理秩亏和病态情况。",
+      "resolvedFontSize": 16,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 16,
+        "typeface": "Aptos",
+        "color": "#5B6573",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 6,
+        "lines": [
+          {
+            "index": 1,
+            "text": "对超定方程 Ax≈b，SVD 给出"
+          },
+          {
+            "index": 2,
+            "text": "Moore-Penrose 伪逆："
+          },
+          {
+            "index": 3,
+            "text": "A⁺ = VΣ⁺Uᵀ。"
+          },
+          {
+            "index": 4,
+            "text": ""
+          },
+          {
+            "index": 5,
+            "text": "于是最小二乘解 x*=A⁺b"
+          },
+          {
+            "index": 6,
+            "text": "能自然处理秩亏和病态情况。"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "对超定方程 Ax≈b，SVD 给出 Moore-Penrose 伪逆：",
+          "resolvedTextStyle": {
+            "fontSize": 16,
+            "typeface": "Aptos",
+            "color": "#5B6573",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "对超定方程 Ax≈b，SVD 给出 Moore-Penrose 伪逆：",
+              "fontSize": 16,
+              "typeface": "Aptos",
+              "color": "#5B6573"
+            }
+          ],
+          "marginLeft": 0
+        },
+        {
+          "index": 2,
+          "text": "A⁺ = VΣ⁺Uᵀ。",
+          "resolvedTextStyle": {
+            "fontSize": 16,
+            "typeface": "Aptos",
+            "color": "#5B6573",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "A⁺ = VΣ⁺Uᵀ。",
+              "fontSize": 16,
+              "typeface": "Aptos",
+              "color": "#5B6573"
+            }
+          ],
+          "marginLeft": 0
+        },
+        {
+          "index": 4,
+          "text": "于是最小二乘解 x*=A⁺b 能自然处理秩亏和病态情况。",
+          "resolvedTextStyle": {
+            "fontSize": 16,
+            "typeface": "Aptos",
+            "color": "#5B6573",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "于是最小二乘解 x*=A⁺b 能自然处理秩亏和病态情况。",
+              "fontSize": 16,
+              "typeface": "Aptos",
+              "color": "#5B6573"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 13,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/o7qpg3ex",
+      "id": "13",
+      "bbox": [
+        468,
+        214,
+        344,
+        320
+      ],
+      "geometry": "rect",
+      "fillColor": "#FFFFFF",
+      "lineColor": "#D8E2EC",
+      "lineWidth": 1
+    },
+    {
+      "order": 14,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/vy90je9c",
+      "id": "14",
+      "bbox": [
+        468,
+        214,
+        6,
+        320
+      ],
+      "geometry": "rect",
+      "fillColor": "#123B64",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 15,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/6dcbulwv",
+      "id": "15",
+      "bbox": [
+        490,
+        232,
+        308,
+        26
+      ],
+      "geometry": "rect",
+      "text": "主成分分析 PCA",
+      "textPreview": "主成分分析 PCA",
+      "resolvedFontSize": 20,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 20,
+        "typeface": "Aptos",
+        "color": "#1E293B",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "主成分分析 PCA"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "主成分分析 PCA",
+          "resolvedTextStyle": {
+            "fontSize": 20,
+            "typeface": "Aptos",
+            "color": "#1E293B",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "主成分分析 PCA",
+              "fontSize": 20,
+              "typeface": "Aptos",
+              "color": "#1E293B",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 16,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/d4vmtwra",
+      "id": "16",
+      "bbox": [
+        490,
+        270,
+        304,
+        250
+      ],
+      "geometry": "rect",
+      "text": "对中心化数据矩阵 X 做 SVD，可直接得到主方向。\n右奇异向量对应主成分方向，奇异值平方反映方差贡献。",
+      "textPreview": "对中心化数据矩阵 X 做 SVD，可直接得到主方向。 | 右奇异向量对应主成分方向，奇异值平方反映方差贡献。",
+      "resolvedFontSize": 16,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 16,
+        "typeface": "Aptos",
+        "color": "#5B6573",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 4,
+        "lines": [
+          {
+            "index": 1,
+            "text": "对中心化数据矩阵 X 做"
+          },
+          {
+            "index": 2,
+            "text": "SVD，可直接得到主方向。"
+          },
+          {
+            "index": 3,
+            "text": "右奇异向量对应主成分方向，奇异值平方"
+          },
+          {
+            "index": 4,
+            "text": "反映方差贡献。"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "对中心化数据矩阵 X 做 SVD，可直接得到主方向。",
+          "resolvedTextStyle": {
+            "fontSize": 16,
+            "typeface": "Aptos",
+            "color": "#5B6573",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "对中心化数据矩阵 X 做 SVD，可直接得到主方向。",
+              "fontSize": 16,
+              "typeface": "Aptos",
+              "color": "#5B6573"
+            }
+          ],
+          "marginLeft": 0
+        },
+        {
+          "index": 2,
+          "text": "右奇异向量对应主成分方向，奇异值平方反映方差贡献。",
+          "resolvedTextStyle": {
+            "fontSize": 16,
+            "typeface": "Aptos",
+            "color": "#5B6573",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "右奇异向量对应主成分方向，奇异值平方反映方差贡献。",
+              "fontSize": 16,
+              "typeface": "Aptos",
+              "color": "#5B6573"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 17,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/oj2t83it",
+      "id": "17",
+      "bbox": [
+        848,
+        214,
+        344,
+        320
+      ],
+      "geometry": "rect",
+      "fillColor": "#FFFDF6",
+      "lineColor": "#D8E2EC",
+      "lineWidth": 1
+    },
+    {
+      "order": 18,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/z25kb6xk",
+      "id": "18",
+      "bbox": [
+        848,
+        214,
+        6,
+        320
+      ],
+      "geometry": "rect",
+      "fillColor": "#D7A23D",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 19,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/6hcrmhk3",
+      "id": "19",
+      "bbox": [
+        870,
+        232,
+        308,
+        26
+      ],
+      "geometry": "rect",
+      "text": "压缩与降噪",
+      "textPreview": "压缩与降噪",
+      "resolvedFontSize": 20,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 20,
+        "typeface": "Aptos",
+        "color": "#1E293B",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "压缩与降噪"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "压缩与降噪",
+          "resolvedTextStyle": {
+            "fontSize": 20,
+            "typeface": "Aptos",
+            "color": "#1E293B",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "压缩与降噪",
+              "fontSize": 20,
+              "typeface": "Aptos",
+              "color": "#1E293B",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 20,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/at47y1kr",
+      "id": "20",
+      "bbox": [
+        870,
+        270,
+        304,
+        250
+      ],
+      "geometry": "rect",
+      "text": "保留前 k 个奇异值，丢弃小奇异值，既能减少存储，又能过滤弱噪声。\n图像压缩、推荐系统、语义检索都常用这类思想。",
+      "textPreview": "保留前 k 个奇异值，丢弃小奇异值，既能减少存储，又能过滤弱噪声。 | 图像压缩、推荐系统、语义检索都常用这类思想。",
+      "resolvedFontSize": 16,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 16,
+        "typeface": "Aptos",
+        "color": "#5B6573",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 5,
+        "lines": [
+          {
+            "index": 1,
+            "text": "保留前 k"
+          },
+          {
+            "index": 2,
+            "text": "个奇异值，丢弃小奇异值，既能减少存储"
+          },
+          {
+            "index": 3,
+            "text": "，又能过滤弱噪声。"
+          },
+          {
+            "index": 4,
+            "text": "图像压缩、推荐系统、语义检索都常用这"
+          },
+          {
+            "index": 5,
+            "text": "类思想。"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "保留前 k 个奇异值，丢弃小奇异值，既能减少存储，又能过滤弱噪声。",
+          "resolvedTextStyle": {
+            "fontSize": 16,
+            "typeface": "Aptos",
+            "color": "#5B6573",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "保留前 k 个奇异值，丢弃小奇异值，既能减少存储，又能过滤弱噪声。",
+              "fontSize": 16,
+              "typeface": "Aptos",
+              "color": "#5B6573"
+            }
+          ],
+          "marginLeft": 0
+        },
+        {
+          "index": 2,
+          "text": "图像压缩、推荐系统、语义检索都常用这类思想。",
+          "resolvedTextStyle": {
+            "fontSize": 16,
+            "typeface": "Aptos",
+            "color": "#5B6573",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "图像压缩、推荐系统、语义检索都常用这类思想。",
+              "fontSize": 16,
+              "typeface": "Aptos",
+              "color": "#5B6573"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 21,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/3ex0nuxc",
+      "id": "21",
+      "bbox": [
+        90,
+        584,
+        1086,
+        40
+      ],
+      "geometry": "rect",
+      "text": "一句话概括：当问题里出现“主方向、低秩结构、病态求解、信息压缩”时，SVD 往往就是合适的工具。",
+      "textPreview": "一句话概括：当问题里出现“主方向、低秩结构、病态求解、信息压缩”时，SVD 往往就是合适的工具。",
+      "resolvedFontSize": 17,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 17,
+        "typeface": "Aptos",
+        "color": "#5B6573",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "一句话概括：当问题里出现“主方向、低秩结构、病态求解、信息压缩”时，SVD 往往就是合适的工具。"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "一句话概括：当问题里出现“主方向、低秩结构、病态求解、信息压缩”时，SVD 往往就是合适的工具。",
+          "resolvedTextStyle": {
+            "fontSize": 17,
+            "typeface": "Aptos",
+            "color": "#5B6573",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "一句话概括：当问题里出现“主方向、低秩结构、病态求解、信息压缩”时，SVD 往往就是合适的工具。",
+              "fontSize": 17,
+              "typeface": "Aptos",
+              "color": "#5B6573"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    }
+  ],
+  "composeRuns": []
+}

@@ -1,0 +1,51 @@
+Slide size: 1280x720
+Safe margins: 72 left/right, 56 top, 52 bottom
+Grid: 12-column flexible layout with 24px gutters
+
+Source style summary:
+- Real source-deck grammar: original academic lecture deck created from prompt
+- Preserved motifs: theorem framing, matrix blocks, structured cards
+- Improved motifs: stronger page rhythm, clearer section coding, modern contrast
+- Motifs explicitly rejected: generic template gradients, cartoon math icons, crowded blackboard styling
+
+Typography:
+- Title: Aptos Display bold
+- Subtitle: Aptos semibold
+- Body: Aptos regular
+- Label: Aptos semibold
+- Footnote: Aptos regular
+- Casing rules: Chinese titles with English symbols/formulas preserved
+
+Palette:
+- Primary: #123B64
+- Secondary: #2F6E9E
+- Accent: #D7A23D
+- Soft accent: #E9F1F7
+- Neutral dark: #1E293B
+- Neutral mid: #5B6573
+- Neutral light: #F6F8FB
+- Usage rules: dark navy for headings, slate for prose, gold for emphasis, pale blue for structural panels
+
+Header:
+- thin top rule plus section tag on content slides
+- page naming uses short chapter phrases
+
+Footer:
+- bottom-left source/context label: Numerical Linear Algebra
+- bottom-right page marker
+
+Icons:
+- Allowed icon family/source: Lucide
+- Stroke/fill/size: 1.8-2.2 stroke, monochrome
+- Placement rules: used only to reinforce section meaning
+- Banned icon treatments: colorful emoji, mixed icon families
+
+Charts and diagrams:
+- prefer editable bars, boxes, arrows, matrix blocks
+- no decorative charts without quantitative meaning
+
+Banned motifs:
+- random formulas as wallpaper
+- fake 3D shapes
+- oversized icon stacks
+- low-contrast tiny footnotes

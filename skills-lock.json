@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "sciverse": {
+      "source": "sciverse.space",
+      "sourceType": "well-known",
+      "computedHash": "c1f17472d18166af7c426d2a3299800b992bd10083f24aa79c5f1b1af10a0f2d"
+    }
+  }
+}

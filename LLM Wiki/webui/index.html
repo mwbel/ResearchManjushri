@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LLM Wiki Intake</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">LLM Wiki</p>
+          <h1>资料入口</h1>
+        </div>
+        <div class="toolbar">
+          <button id="refreshButton" class="icon-button" type="button" title="刷新">↻</button>
+          <button id="rebuildButton" class="secondary" type="button">重建网络</button>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <aside class="nav-rail">
+          <section class="panel">
+            <div class="section-title">
+              <h2>学科网络</h2>
+            </div>
+            <div id="domainList" class="domain-list"></div>
+          </section>
+
+          <section class="panel">
+            <div class="section-title">
+              <h2>最近资料</h2>
+            </div>
+            <div id="recentList" class="recent-list"></div>
+          </section>
+        </aside>
+
+        <section class="center-stage">
+          <section class="panel concept-panel">
+            <div class="section-title">
+              <div>
+                <h2>概念网络</h2>
+                <p id="graphSummary" class="panel-subtitle">选择学科后查看 concept graph 与 concept relations。</p>
+              </div>
+              <div class="graph-controls">
+                <select id="graphDomainSelect" class="mini-select"></select>
+                <button id="refreshGraphButton" class="secondary" type="button">刷新图谱</button>
+              </div>
+            </div>
+            <div id="conceptGraph" class="concept-graph"></div>
+            <div id="relationTable" class="relation-table"></div>
+            <div class="wiki-reader">
+              <article id="wikiArticle" class="wiki-article"></article>
+              <aside class="wiki-sidebar">
+                <div class="wiki-card">
+                  <h3>相关概念</h3>
+                  <div id="wikiConceptList" class="wiki-concept-list"></div>
+                </div>
+                <div class="wiki-card">
+                  <h3>关系证据</h3>
+                  <div id="wikiEdgeList" class="wiki-edge-list"></div>
+                </div>
+              </aside>
+            </div>
+          </section>
+        </section>
+
+        <aside class="composer-rail">
+          <section class="panel intake-panel">
+            <div class="section-title">
+              <h2>新增资料</h2>
+              <div class="segmented" role="tablist" aria-label="资料类型">
+                <button class="segment active" type="button" data-mode="web">网页</button>
+                <button class="segment" type="button" data-mode="local">本地</button>
+                <button class="segment" type="button" data-mode="note">笔记</button>
+              </div>
+            </div>
+
+            <form id="sourceForm" class="form-grid">
+              <input type="hidden" id="sourceType" value="web" />
+
+            <label class="field field-wide">
+              <span>标题</span>
+              <input id="title" name="title" autocomplete="off" required />
+            </label>
+
+            <label class="field">
+              <span>学科</span>
+              <select id="domain" name="domain"></select>
+            </label>
+
+            <label class="field new-domain-only hidden">
+              <span>新学科名称</span>
+              <input id="newDomainLabel" name="new_domain_label" autocomplete="off" placeholder="认知科学" />
+            </label>
+
+            <label class="field new-domain-only hidden">
+              <span>新学科标识</span>
+              <input id="newDomainSlug" name="new_domain_slug" autocomplete="off" placeholder="cognitive-science" />
+            </label>
+
+            <label class="field">
+              <span>类型</span>
+              <select id="kind" name="kind">
+                <option value="article">article</option>
+                <option value="paper">paper</option>
+                <option value="book">book</option>
+                <option value="note">note</option>
+                <option value="dataset">dataset</option>
+                <option value="video">video</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span>日期</span>
+              <input id="date" name="date" type="date" required />
+            </label>
+
+            <label class="field">
+              <span>状态</span>
+              <select id="status" name="status">
+                <option value="inbox">inbox</option>
+                <option value="active">active</option>
+                <option value="archived">archived</option>
+              </select>
+            </label>
+
+            <label class="field field-wide web-only">
+              <span>网页链接</span>
+              <input id="sourceUrl" name="source_url" type="url" placeholder="https://..." />
+            </label>
+
+            <label class="field field-wide local-only hidden">
+              <span>上传文件</span>
+              <input id="localFile" name="local_file" type="file" />
+            </label>
+
+            <label class="field field-wide local-only hidden">
+              <span>本地路径或上传后路径</span>
+              <input id="localPath" name="local_path" placeholder="/Users/..." />
+            </label>
+
+            <label class="field">
+              <span>作者</span>
+              <input id="author" name="author" autocomplete="off" />
+            </label>
+
+            <label class="field">
+              <span>发表</span>
+              <input id="published" name="published" autocomplete="off" />
+            </label>
+
+            <label class="field field-wide">
+              <span>标签</span>
+              <input id="tags" name="tags" autocomplete="off" placeholder="logic, proof" />
+            </label>
+
+            <label class="field field-wide">
+              <span>收录理由</span>
+              <textarea id="context" name="context" rows="3"></textarea>
+            </label>
+
+            <label class="field field-wide">
+              <span>摘录</span>
+              <textarea id="originalContent" name="original_content" rows="5"></textarea>
+            </label>
+
+            <label class="field field-wide">
+              <span>备注</span>
+              <textarea id="notes" name="notes" rows="3"></textarea>
+            </label>
+
+            <div class="checks field-wide">
+              <label><input id="autoIngest" type="checkbox" checked /> 自动 ingest</label>
+              <label><input id="conceptNetwork" type="checkbox" checked /> 概念网络</label>
+              <label><input id="rebuildDomain" type="checkbox" checked /> 学科网络</label>
+              <label><input id="rebuildIndex" type="checkbox" checked /> 总索引</label>
+              <label><input id="runLint" type="checkbox" /> Lint</label>
+            </div>
+
+            <div class="actions field-wide">
+              <button id="previewButton" class="secondary" type="button">预览</button>
+              <button class="primary" type="submit">新增资料</button>
+            </div>
+          </form>
+          </section>
+
+          <section class="panel output-panel">
+            <div class="section-title">
+              <h2>结果</h2>
+              <button id="clearOutput" class="icon-button" type="button" title="清空">×</button>
+            </div>
+            <pre id="output">Ready.</pre>
+          </section>
+        </aside>
+      </main>
+    </div>
+
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="/app.js"></script>
+  </body>
+</html>
