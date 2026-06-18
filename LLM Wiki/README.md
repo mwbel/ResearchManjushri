@@ -109,6 +109,24 @@ python3 scripts/lint_wiki.py
 python3 scripts/wiki_web.py
 ```
 
+如果要自动启用 Sciverse，可先把 API token 存入 macOS Keychain：
+
+```bash
+scripts/store_sciverse_token.command
+```
+
+之后用启动脚本自动读取 Keychain 并启动 Web UI：
+
+```bash
+./start_llm_wiki.command
+```
+
+开发期也可以直接运行 `python3 scripts/wiki_web.py`；后端在调用 Sciverse 时会按顺序读取：
+
+1. 环境变量 `SCIVERSE_API_TOKEN`
+2. 前端本次请求填写的 token
+3. macOS Keychain 服务 `llm-wiki-sciverse`
+
 默认地址：
 
 - `http://127.0.0.1:8765`
