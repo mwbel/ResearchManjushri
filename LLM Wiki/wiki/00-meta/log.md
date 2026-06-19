@@ -184,3 +184,91 @@ sources: []
 - 将资料入口从上下堆叠布局调整为三栏工作台：左侧为学科网络和最近资料，中间为概念图谱与类 Wikipedia 阅读器，右侧为新增资料和运行结果。
 - 让最新阅读内容和概念网络进入首屏主区域，新增资料表单作为右侧 composer 保持随手可用。
 - 增加桌面、窄屏和手机断点，窄屏时优先显示阅读区，再显示新增资料和导航。
+
+## [2026-06-17] setup | Add knowledge workbench queue
+
+- agent: codex
+- 新增 `/api/workbench?domain=<domain>`，按学科汇总 raw sources、source summaries、concepts、relations 与待整理队列。
+- Web UI 中央主区域新增“知识工作台”，展示当前学科的统计、待整理概念、待补资料和最近更新。
+- 待整理概念可直接跳转到类 Wikipedia 概念阅读器，帮助从“导入资料”进入“整理知识”的下一步。
+
+## [2026-06-17] setup | Add Sciverse academic search entry
+
+- agent: codex
+- 新增 `/api/sciverse/search`，通过本地 `sciverse` skill 脚本调用 `semantic_search` 或 `search_papers`。
+- Web UI 右侧新增“学术检索”面板，可填写本次会话 Sciverse token、选择语义证据或论文元数据检索。
+- Token 不写入项目文件或日志；后端仅在调用 Sciverse 子进程时通过环境变量传递。
+
+## [2026-06-17] setup | Close Sciverse source/evidence loop
+
+- agent: codex
+- 新增 `/api/sciverse/import-source`，可把 Sciverse 论文结果转换为 `source_type: sciverse` 的 raw source，并接入现有 auto ingest、概念网络和索引重建流程。
+- 新增 `/api/concepts/academic-evidence`，可把选中论文作为 `Academic Evidence` 写入当前 concept 页，和 `Source-Derived Evidence` 分层保存。
+- Web UI 的 Sciverse 结果卡片新增 `导入 source`、`补强当前概念`、`导入并补强` 三个动作，形成“检索论文 → 导入 source → 补强 concept”的闭环。
+
+## [2026-06-17] setup | Automate Sciverse token loading
+
+- agent: codex
+- 新增 `scripts/store_sciverse_token.command`，用于把 Sciverse API token 存入 macOS Keychain。
+- 新增 `start_llm_wiki.command`，启动 Web UI 时自动从 Keychain 读取 token 并导出为 `SCIVERSE_API_TOKEN`。
+- README 增加 Keychain 启动说明，避免把 token 写入项目文件、日志或前端代码。
+
+## [2026-06-17] fix | Shorten Sciverse network errors
+
+- agent: codex
+- 将 Sciverse `fetch failed`、`UND_ERR_SOCKET`、认证失败和限额错误映射为简短中文提示，避免 Node stack trace 撑满前端右栏。
+- 限制 Sciverse 结果区域高度并允许滚动，长错误或长结果不再破坏资料入口布局。
+- 本地诊断显示 `api.sciverse.space` 当前解析到 `198.18.0.173`，属于本机代理/TUN/fake-ip 网络路径，需要优先检查代理节点或模式。
+
+## [2026-06-17] fix | Add curl fallback for Sciverse
+
+- agent: codex
+- Sciverse 检索默认继续优先调用本地 skill 的 Node 脚本。
+- 当 Node `fetch/undici` 出现 `UND_ERR_SOCKET`、`fetch failed` 或 `other side closed` 时，后端会自动退回系统 `curl` 调用 Sciverse API。
+- 可用 `SCIVERSE_TRANSPORT=curl ./start_llm_wiki.command` 强制 Sciverse 全程走 curl，适配代理/TUN/fake-ip 下 Node fetch 不稳定的场景。
+
+## [2026-06-17] fix | Guard concept graph from metadata/tool noise
+
+- agent: codex
+- 收紧 `scripts/concept_ingest.py` 的候选概念规则，过滤 `Title`、`Author`、`Doc ID`、`DOI`、`Score`、`Offset`、`Sciverse`、`academic`、`RAG`、`LightRAG` 等工具和元数据词。
+- Sciverse source 现在默认只作为 source/evidence 导入，不再自动触发概念网络生成；论文元数据保存在 Notes，正文摘录才进入 source summary。
+- Web UI 新增 `删除当前概念`，会删除概念页并清理其他概念页中指向它的自动关系。
+- 已清理 `ai智能体` 图谱中的 metadata/tool 污染节点并重建全部 domain network。
+
+## [2026-06-17] update | Auto-read Sciverse token from Keychain
+
+- agent: codex
+- Sciverse 调用现在按 `SCIVERSE_API_TOKEN`、前端本次 token、macOS Keychain `llm-wiki-sciverse` 的顺序读取 token。
+- 开发期可直接运行 `python3 scripts/wiki_web.py`，前端 Sciverse Token 留空也能使用 Keychain 中的 token。
+- README 和前端占位文案已更新，token 仍不写入项目文件或前端代码。
+
+## [2026-06-17] setup | Add per-domain source management
+
+- agent: codex
+- 新增 `/api/sources?domain=...`、`/api/sources/update`、`/api/sources/delete`，支持按学科查看、编辑和删除 raw source。
+- Web UI 新增“学科资料”面板；点击左侧学科会同步切换工作台、概念图谱和该学科资料列表。
+- `新增到此学科` 会把新增资料表单预选到当前学科；资料卡片可展开编辑、修改学科、保存、Ingest 或删除。
+- 删除资料时会删除 raw source 和对应 source summary，但保留本地上传的原始文件，避免误删资料库资产。
+
+## [2026-06-18] setup | Add Science main-journal candidate tracker
+
+- agent: codex
+- 新增 `/api/trackers/science`，通过 Sciverse 元数据检索使用 `Science + topic + years` 查询，默认跟踪 `hierarchical memory` 近两年候选论文。
+- Web UI 右侧新增“Science 主刊候选追踪”面板，可设置主题、年份和数量，并复用论文结果卡片。
+- 追踪结果会根据返回的期刊字段显示 `Science match` 或“候选，需核对期刊”，避免把宽松检索误判成主刊命中。
+- Science 追踪结果可直接导入 source 或补强当前概念；导入时自动增加 `science-main`、`journal-tracker`、`memory` 标签。
+
+## [2026-06-18] update | Improve intake and concept reading flow
+
+- agent: codex
+- 将“新增资料”移动到最左侧学科栏上方，并增加隐藏/恢复按钮，减少非录入状态下的视觉占用。
+- 概念页现在优先显示类 Wikipedia 阅读器，再把关系表折叠为辅助信息，避免关系明细压住概念解释。
+- 将右侧“结果”改名为“运行日志”，说明它显示操作返回而不是知识正文。
+- 为 `Skill` / `Skills` 补充人工可读定义、价值说明，并在前端首屏显示“简明解释”。
+
+## [2026-06-18] update | Add direct source deletion and concept cleanup
+
+- agent: codex
+- 在“最近资料”“待补资料”“最近更新”和“学科资料”中提供直接删除入库资料的入口。
+- 删除资料时会删除 raw source 与对应 source summary，并默认移除只由该资料生成的孤立 `auto-concept` 页面。
+- 删除时保留本地上传的原始文件，避免误删本地资料库资产。

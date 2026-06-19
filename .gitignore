@@ -2,65 +2,55 @@
 .DS_Store
 Thumbs.db
 
-# Python 缓存
+# 缓存与环境
 __pycache__/
 *.pyc
-*.pyo
-*.pyd
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-
-# 虚拟环境
 .venv/
 venv/
 env/
-
-# Node / 前端依赖
 node_modules/
 dist/
 build/
-.next/
-.vite/
+.cache/
 
-# 本地环境变量与密钥
+# 密钥
 .env
 .env.*
 *.pem
 *.key
-*.crt
-*.p12
 *.token
 secrets/
 credentials/
 
-# 日志和临时文件
+# 临时文件
 *.log
-logs/
+*.swp
 tmp/
 temp/
-.cache/
 
-# 大型数据、RAG、OCR、PDF、模型文件
-RAG/
-rag/
-data/
-datasets/
-outputs/
-ocr/
-chunks/
-merged/
-mathpix_rag_outputs*/
+# 大文件与媒体
+*.m4a
+*.mp3
+*.wav
+*.mp4
+*.mov
 *.pdf
 *.caj
-*.docx
-*.pptx
-*.xlsx
 *.zip
 *.tar
 *.gz
+*.docx
+*.pptx
+*.xlsx
 
-# 模型与向量库
+# 原始资料与输入
+本质之探索/
+需读论文/
+inputs/
+LLM Wiki/raw/
+LLM Wiki/wiki/sources/
+
+# 模型与数据库
 models/
 checkpoints/
 *.bin
@@ -76,4 +66,3 @@ checkpoints/
 # 备份
 *_backup/
 backup/
-versions/*/.local_rag

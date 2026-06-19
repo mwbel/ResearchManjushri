@@ -3,7 +3,7 @@ title: 物理 Knowledge Network
 type: domain
 status: active
 created: 2026-06-17
-updated: 2026-06-17
+updated: 2026-06-19
 summary: 物理 单学科知识网络入口，串联网页文章、本地资料、source summary、concept、analysis 与待办问题。
 tags: [physics, domain-network]
 sources: []
@@ -18,7 +18,7 @@ sources: []
 - Registered raw sources: 0
 - Connected wiki pages: 1
 - Inbox sources waiting for ingest: 0
-- Generated on: 2026-06-17
+- Generated on: 2026-06-19
 
 ## How To Add Knowledge
 
@@ -34,6 +34,19 @@ flowchart LR
     D["物理"]
     D --> W1["concept: Physics"]
 ```
+
+## Concept Graph
+
+```mermaid
+flowchart LR
+    Seed["等待概念关系抽取"]
+```
+
+## Concept Relations
+
+| Source Concept | Relation | Target Concept | Evidence |
+| --- | --- | --- | --- |
+| 待补 | 待补 | 待补 | 自动概念抽取后生成 |
 
 ## Source Intake
 
