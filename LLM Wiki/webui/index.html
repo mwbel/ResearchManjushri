@@ -21,6 +21,172 @@
 
       <main class="workspace">
         <aside class="nav-rail">
+          <section id="intakePanel" class="panel intake-panel">
+            <div class="section-title">
+              <h2>新增资料</h2>
+              <div class="intake-header-actions">
+                <div class="segmented" role="tablist" aria-label="资料类型">
+                  <button class="segment active" type="button" data-mode="web">网页</button>
+                  <button class="segment" type="button" data-mode="local">本地</button>
+                  <button class="segment" type="button" data-mode="note">笔记</button>
+                </div>
+                <button id="hideIntakeButton" class="icon-button" type="button" title="隐藏新增资料">×</button>
+              </div>
+            </div>
+
+            <form id="sourceForm" class="form-grid">
+              <input type="hidden" id="sourceType" value="web" />
+
+              <label class="field field-wide">
+                <span>标题</span>
+                <input id="title" name="title" autocomplete="off" required />
+              </label>
+
+              <label class="field">
+                <span>学科</span>
+                <select id="domain" name="domain"></select>
+              </label>
+
+              <label class="field new-domain-only hidden">
+                <span>新学科名称</span>
+                <input id="newDomainLabel" name="new_domain_label" autocomplete="off" placeholder="认知科学" />
+              </label>
+
+              <label class="field new-domain-only hidden">
+                <span>新学科标识</span>
+                <input id="newDomainSlug" name="new_domain_slug" autocomplete="off" placeholder="cognitive-science" />
+              </label>
+
+              <label class="field">
+                <span>类型</span>
+                <select id="kind" name="kind">
+                  <option value="article">article</option>
+                  <option value="paper">paper</option>
+                  <option value="book">book</option>
+                  <option value="note">note</option>
+                  <option value="dataset">dataset</option>
+                  <option value="video">video</option>
+                </select>
+              </label>
+
+              <label class="field">
+                <span>日期</span>
+                <input id="date" name="date" type="date" required />
+              </label>
+
+              <label class="field">
+                <span>状态</span>
+                <select id="status" name="status">
+                  <option value="inbox">inbox</option>
+                  <option value="active">active</option>
+                  <option value="archived">archived</option>
+                </select>
+              </label>
+
+              <label class="field field-wide web-only">
+                <span>网页链接</span>
+                <input id="sourceUrl" name="source_url" type="url" placeholder="https://..." />
+              </label>
+
+              <label class="field field-wide local-only hidden">
+                <span>上传文件</span>
+                <input id="localFile" name="local_file" type="file" />
+              </label>
+
+              <label class="field field-wide local-only hidden">
+                <span>本地路径或上传后路径</span>
+                <input id="localPath" name="local_path" placeholder="/Users/..." />
+              </label>
+
+              <label class="field">
+                <span>作者</span>
+                <input id="author" name="author" autocomplete="off" />
+              </label>
+
+              <label class="field">
+                <span>发表</span>
+                <input id="published" name="published" autocomplete="off" />
+              </label>
+
+              <label class="field field-wide">
+                <span>标签</span>
+                <input id="tags" name="tags" autocomplete="off" placeholder="logic, proof" />
+              </label>
+
+              <label class="field field-wide">
+                <span>收录理由</span>
+                <textarea id="context" name="context" rows="3"></textarea>
+              </label>
+
+              <label class="field field-wide">
+                <span>摘录</span>
+                <textarea id="originalContent" name="original_content" rows="5"></textarea>
+              </label>
+
+              <label class="field field-wide">
+                <span>备注</span>
+                <textarea id="notes" name="notes" rows="3"></textarea>
+              </label>
+
+              <div class="checks field-wide">
+                <label><input id="autoIngest" type="checkbox" checked /> 自动 ingest</label>
+                <label><input id="conceptNetwork" type="checkbox" checked /> 概念网络</label>
+                <label><input id="rebuildDomain" type="checkbox" checked /> 学科网络</label>
+                <label><input id="rebuildIndex" type="checkbox" checked /> 总索引</label>
+                <label><input id="runLint" type="checkbox" /> Lint</label>
+              </div>
+
+              <div class="actions field-wide">
+                <button id="previewButton" class="secondary" type="button">预览</button>
+                <button class="primary" type="submit">新增资料</button>
+              </div>
+            </form>
+          </section>
+
+          <button id="showIntakeButton" class="secondary hidden" type="button">新增资料</button>
+
+          <section id="scienceTrackerPanel" class="panel sciverse-panel science-tracker-panel">
+            <div class="section-title">
+              <div>
+                <h2>Science 主刊候选追踪</h2>
+                <p class="panel-subtitle">用 Science + 主题检索候选论文，导入前以卡片中的期刊字段为准。</p>
+              </div>
+              <button id="hideScienceTrackerButton" class="icon-button" type="button" title="隐藏 Science 追踪">×</button>
+            </div>
+            <form id="scienceTrackerForm" class="sciverse-form">
+              <label class="field">
+                <span>主题</span>
+                <textarea id="scienceTrackerQuery" rows="2" placeholder="hierarchical memory">hierarchical memory</textarea>
+              </label>
+              <div class="sciverse-options">
+                <label class="field">
+                  <span>起始年份</span>
+                  <input id="scienceTrackerYearFrom" type="number" min="1900" max="2100" value="2025" />
+                </label>
+                <label class="field">
+                  <span>结束年份</span>
+                  <input id="scienceTrackerYearTo" type="number" min="1900" max="2100" value="2026" />
+                </label>
+              </div>
+              <div class="sciverse-options">
+                <label class="field">
+                  <span>数量</span>
+                  <input id="scienceTrackerLimit" type="number" min="1" max="30" value="8" />
+                </label>
+                <label class="field">
+                  <span>期刊</span>
+                  <input id="scienceTrackerJournal" value="Science" disabled />
+                </label>
+              </div>
+              <div class="actions">
+                <button class="secondary" type="submit">追踪 Science</button>
+              </div>
+            </form>
+            <div id="scienceTrackerResults" class="sciverse-results"></div>
+          </section>
+
+          <button id="showScienceTrackerButton" class="secondary hidden" type="button">Science 主刊候选追踪</button>
+
           <section class="panel">
             <div class="section-title">
               <h2>学科网络</h2>
@@ -37,6 +203,53 @@
         </aside>
 
         <section class="center-stage">
+          <section class="panel source-manager-panel">
+            <div class="section-title">
+              <div>
+                <h2 id="sourceManagerTitle">学科资料</h2>
+                <p id="sourceManagerSummary" class="panel-subtitle">点击左侧学科后，优先显示该学科包含的全部资料。</p>
+              </div>
+              <div class="graph-controls">
+                <button id="newSourceForDomainButton" class="secondary" type="button">新增到此学科</button>
+                <button id="refreshSourcesButton" class="secondary" type="button">刷新资料</button>
+              </div>
+            </div>
+            <div id="domainSourceList" class="domain-source-list"></div>
+          </section>
+
+          <section class="panel workbench-panel">
+            <div class="section-title">
+              <div>
+                <h2>知识工作台</h2>
+                <p id="workbenchSummary" class="panel-subtitle">按当前学科汇总待整理资料、概念和最近更新。</p>
+              </div>
+              <div class="graph-controls">
+                <button id="organizeConceptsButton" class="secondary" type="button">预览自动整理</button>
+                <button id="applyOrganizeConceptsButton" class="primary" type="button">应用高置信整理</button>
+                <button id="refreshWorkbenchButton" class="secondary" type="button">刷新工作台</button>
+              </div>
+            </div>
+            <div id="workbenchStats" class="workbench-stats"></div>
+            <div id="organizeConceptsResult" class="organize-result hidden"></div>
+            <div class="workbench-grid">
+              <div class="workbench-card">
+                <h3>待整理概念</h3>
+                <div id="conceptQueue" class="task-list"></div>
+              </div>
+              <div class="workbench-card">
+                <div class="card-title-row">
+                  <h3>待补资料</h3>
+                  <button id="autoSupplementQueueButton" class="inline-action" type="button">一键生成草稿</button>
+                </div>
+                <div id="sourceQueue" class="task-list"></div>
+              </div>
+              <div class="workbench-card">
+                <h3>最近更新</h3>
+                <div id="workbenchRecent" class="task-list"></div>
+              </div>
+            </div>
+          </section>
+
           <section class="panel concept-panel">
             <div class="section-title">
               <div>
@@ -49,7 +262,33 @@
               </div>
             </div>
             <div id="conceptGraph" class="concept-graph"></div>
-            <div id="relationTable" class="relation-table"></div>
+            <details class="relation-details">
+              <summary>关系表</summary>
+              <div id="relationTable" class="relation-table"></div>
+            </details>
+          </section>
+        </section>
+
+        <aside class="composer-rail">
+          <section class="panel concept-detail-panel">
+            <div class="section-title">
+              <div>
+                <h2>当前概念</h2>
+                <p class="panel-subtitle">点击“待整理概念”、图谱节点或概念链接后在这里阅读。</p>
+              </div>
+              <div class="concept-header-actions">
+                <button id="keepConceptButton" class="inline-action hidden" type="button">保留为独立概念页</button>
+                <button id="deleteConceptButton" class="icon-button danger-icon-button" type="button" title="删除当前概念" aria-label="删除当前概念">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M3 6h18"></path>
+                    <path d="M8 6V4h8v2"></path>
+                    <path d="M6 6l1 15h10l1-15"></path>
+                    <path d="M10 11v6"></path>
+                    <path d="M14 11v6"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
             <div class="wiki-reader">
               <article id="wikiArticle" class="wiki-article"></article>
               <aside class="wiki-sidebar">
@@ -64,131 +303,67 @@
               </aside>
             </div>
           </section>
-        </section>
 
-        <aside class="composer-rail">
-          <section class="panel intake-panel">
+          <section class="panel sciverse-panel">
             <div class="section-title">
-              <h2>新增资料</h2>
-              <div class="segmented" role="tablist" aria-label="资料类型">
-                <button class="segment active" type="button" data-mode="web">网页</button>
-                <button class="segment" type="button" data-mode="local">本地</button>
-                <button class="segment" type="button" data-mode="note">笔记</button>
+              <div>
+                <h2>学术检索</h2>
+                <p class="panel-subtitle">用 Sciverse 查找可引用论文和正文片段。</p>
               </div>
             </div>
-
-            <form id="sourceForm" class="form-grid">
-              <input type="hidden" id="sourceType" value="web" />
-
-            <label class="field field-wide">
-              <span>标题</span>
-              <input id="title" name="title" autocomplete="off" required />
-            </label>
-
-            <label class="field">
-              <span>学科</span>
-              <select id="domain" name="domain"></select>
-            </label>
-
-            <label class="field new-domain-only hidden">
-              <span>新学科名称</span>
-              <input id="newDomainLabel" name="new_domain_label" autocomplete="off" placeholder="认知科学" />
-            </label>
-
-            <label class="field new-domain-only hidden">
-              <span>新学科标识</span>
-              <input id="newDomainSlug" name="new_domain_slug" autocomplete="off" placeholder="cognitive-science" />
-            </label>
-
-            <label class="field">
-              <span>类型</span>
-              <select id="kind" name="kind">
-                <option value="article">article</option>
-                <option value="paper">paper</option>
-                <option value="book">book</option>
-                <option value="note">note</option>
-                <option value="dataset">dataset</option>
-                <option value="video">video</option>
-              </select>
-            </label>
-
-            <label class="field">
-              <span>日期</span>
-              <input id="date" name="date" type="date" required />
-            </label>
-
-            <label class="field">
-              <span>状态</span>
-              <select id="status" name="status">
-                <option value="inbox">inbox</option>
-                <option value="active">active</option>
-                <option value="archived">archived</option>
-              </select>
-            </label>
-
-            <label class="field field-wide web-only">
-              <span>网页链接</span>
-              <input id="sourceUrl" name="source_url" type="url" placeholder="https://..." />
-            </label>
-
-            <label class="field field-wide local-only hidden">
-              <span>上传文件</span>
-              <input id="localFile" name="local_file" type="file" />
-            </label>
-
-            <label class="field field-wide local-only hidden">
-              <span>本地路径或上传后路径</span>
-              <input id="localPath" name="local_path" placeholder="/Users/..." />
-            </label>
-
-            <label class="field">
-              <span>作者</span>
-              <input id="author" name="author" autocomplete="off" />
-            </label>
-
-            <label class="field">
-              <span>发表</span>
-              <input id="published" name="published" autocomplete="off" />
-            </label>
-
-            <label class="field field-wide">
-              <span>标签</span>
-              <input id="tags" name="tags" autocomplete="off" placeholder="logic, proof" />
-            </label>
-
-            <label class="field field-wide">
-              <span>收录理由</span>
-              <textarea id="context" name="context" rows="3"></textarea>
-            </label>
-
-            <label class="field field-wide">
-              <span>摘录</span>
-              <textarea id="originalContent" name="original_content" rows="5"></textarea>
-            </label>
-
-            <label class="field field-wide">
-              <span>备注</span>
-              <textarea id="notes" name="notes" rows="3"></textarea>
-            </label>
-
-            <div class="checks field-wide">
-              <label><input id="autoIngest" type="checkbox" checked /> 自动 ingest</label>
-              <label><input id="conceptNetwork" type="checkbox" checked /> 概念网络</label>
-              <label><input id="rebuildDomain" type="checkbox" checked /> 学科网络</label>
-              <label><input id="rebuildIndex" type="checkbox" checked /> 总索引</label>
-              <label><input id="runLint" type="checkbox" /> Lint</label>
-            </div>
-
-            <div class="actions field-wide">
-              <button id="previewButton" class="secondary" type="button">预览</button>
-              <button class="primary" type="submit">新增资料</button>
-            </div>
-          </form>
+            <form id="sciverseForm" class="sciverse-form">
+              <label class="field">
+                <span>Sciverse Token</span>
+                <input id="sciverseToken" type="password" autocomplete="off" placeholder="留空则使用 Keychain / 环境变量" />
+              </label>
+              <label class="field">
+                <span>检索方式</span>
+                <select id="sciverseSearchType">
+                  <option value="semantic">语义证据</option>
+                  <option value="metadata">论文元数据</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>问题或关键词</span>
+                <textarea id="sciverseQuery" rows="3" placeholder="Transformer attention mechanism knowledge representation"></textarea>
+              </label>
+              <div class="sciverse-options">
+                <label class="field">
+                  <span>数量</span>
+                  <input id="sciverseLimit" type="number" min="1" max="30" value="5" />
+                </label>
+                <label class="field">
+                  <span>模式</span>
+                  <select id="sciverseMode">
+                    <option value="balanced">balanced</option>
+                    <option value="quality">quality</option>
+                    <option value="fast">fast</option>
+                  </select>
+                </label>
+              </div>
+              <div class="sciverse-options metadata-only hidden">
+                <label class="field">
+                  <span>起始年份</span>
+                  <input id="sciverseYearFrom" type="number" min="1900" max="2100" placeholder="2017" />
+                </label>
+                <label class="field">
+                  <span>结束年份</span>
+                  <input id="sciverseYearTo" type="number" min="1900" max="2100" />
+                </label>
+              </div>
+              <div class="actions">
+                <button class="secondary" type="submit">检索论文</button>
+              </div>
+            </form>
+            <div id="sciverseResults" class="sciverse-results"></div>
           </section>
 
           <section class="panel output-panel">
             <div class="section-title">
-              <h2>结果</h2>
+              <div>
+                <h2>运行日志</h2>
+                <p class="panel-subtitle">显示导入、检索、ingest 等操作返回，不是知识正文。</p>
+              </div>
               <button id="clearOutput" class="icon-button" type="button" title="清空">×</button>
             </div>
             <pre id="output">Ready.</pre>

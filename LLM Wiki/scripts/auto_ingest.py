@@ -19,6 +19,27 @@ RAW_SOURCES = ROOT / "raw" / "sources"
 WIKI = ROOT / "wiki"
 WIKI_SOURCES = WIKI / "sources"
 WIKI_CONCEPTS = WIKI / "concepts"
+
+NOISE_CANDIDATE_TAGS = {
+    "source",
+    "local",
+    "web",
+    "paper",
+    "article",
+    "note",
+    "dataset",
+    "video",
+    "sciverse",
+    "academic",
+    "rag",
+    "lightrag",
+    "graphrag",
+    "rag-anything",
+    "inbox",
+    "active",
+    "preview",
+    "validation",
+}
 WIKI_DOMAINS = WIKI / "domains"
 DEFAULT_WECHAT_CRAWLER = Path(
     "/Users/Min369/Documents/同步空间/Manju/AIProjects/MZ数据库/心之髓/wechat_crawler"
@@ -113,6 +134,27 @@ def remove_placeholders(text: str) -> str:
         if stripped in PLACEHOLDERS:
             continue
         if stripped.startswith("学科归属："):
+            continue
+        cleaned_lines.append(line)
+    return "\n".join(cleaned_lines).strip()
+
+
+def clean_sciverse_original(text: str) -> str:
+    cleaned_lines: list[str] = []
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            cleaned_lines.append("")
+            continue
+        bullet = re.sub(r"^\s*[-*]\s+", "", line)
+        if bullet in {"Sciverse academic retrieval result.", "Sciverse academic retrieval result"}:
+            continue
+        if re.match(r"^(?:Title|Doc ID|Authors?|Auth|Year|Venue|DOI|Score|Retrieval query|Offset)\s*:", bullet, re.I):
+            continue
+        if bullet.lower().startswith("excerpt:"):
+            excerpt = bullet.split(":", 1)[1].strip()
+            if excerpt:
+                cleaned_lines.append(excerpt)
             continue
         cleaned_lines.append(line)
     return "\n".join(cleaned_lines).strip()
@@ -417,6 +459,9 @@ def build_summary(raw_path: Path, fetch_web: bool = True, read_local: bool = Tru
     original = remove_placeholders(sections.get("Original Content Or Extract", ""))
     notes = remove_placeholders(sections.get("Notes", ""))
 
+    if source_type == "sciverse":
+        original = clean_sciverse_original(original)
+
     external_text = ""
     extraction_status = "skipped"
     crawler_info: dict[str, str] = {}
@@ -454,9 +499,9 @@ def build_summary(raw_path: Path, fetch_web: bool = True, read_local: bool = Tru
     candidate_concepts = [
         tag
         for tag in tags
-        if tag not in {"source", domain_slug, "inbox", "active", "preview", "validation"}
+        if tag not in NOISE_CANDIDATE_TAGS and tag != domain_slug
     ]
-    if not candidate_concepts:
+    if not candidate_concepts and source_type != "sciverse":
         candidate_concepts = [domain_label, kind, source_type]
 
     raw_rel = raw_path.relative_to(ROOT).as_posix()

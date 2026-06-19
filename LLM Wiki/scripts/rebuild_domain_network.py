@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import json
 import os
 import re
 from pathlib import Path
@@ -13,6 +14,7 @@ ROOT = Path(__file__).resolve().parent.parent
 RAW_SOURCES = ROOT / "raw" / "sources"
 WIKI = ROOT / "wiki"
 DOMAINS = WIKI / "domains"
+DELETED_DOMAINS_FILE = ROOT / ".llm-wiki-deleted-domains.json"
 
 KNOWN_DOMAIN_LABELS = {
     "general": "通用",
@@ -55,6 +57,18 @@ def parse_list(value: str | None) -> list[str]:
     return items
 
 
+def load_deleted_domains() -> set[str]:
+    if not DELETED_DOMAINS_FILE.exists():
+        return set()
+    try:
+        payload = json.loads(DELETED_DOMAINS_FILE.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return set()
+    if isinstance(payload, list):
+        return {str(item).strip() for item in payload if str(item).strip()}
+    return set()
+
+
 def rel_link(from_dir: Path, target: Path) -> str:
     return Path(os.path.relpath(target, from_dir)).as_posix()
 
@@ -69,7 +83,8 @@ def title_for(path: Path, meta: dict[str, str]) -> str:
 
 
 def discovered_domains() -> list[str]:
-    domains = set(KNOWN_DOMAIN_LABELS)
+    deleted_domains = load_deleted_domains()
+    domains = set(KNOWN_DOMAIN_LABELS) - deleted_domains
     if RAW_SOURCES.exists():
         for path in RAW_SOURCES.iterdir():
             if path.is_dir() and not path.name.startswith("."):

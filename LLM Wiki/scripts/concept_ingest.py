@@ -39,9 +39,99 @@ STOPWORDS = {
     "local",
     "paper",
     "article",
+    "Title",
+    "Author",
+    "Authors",
+    "Auth",
+    "Doc ID",
+    "DOI",
+    "Year",
+    "Venue",
+    "Score",
+    "Offset",
+    "Excerpt",
+    "Retrieval",
+    "Query",
+    "Sciverse",
+    "academic",
+    "RAG",
+    "LightRAG",
+    "GraphRAG",
+    "RAG-Anything",
+}
+
+NOISE_TERMS = {
+    "title",
+    "author",
+    "authors",
+    "auth",
+    "doc id",
+    "doc-id",
+    "doi",
+    "year",
+    "venue",
+    "score",
+    "offset",
+    "excerpt",
+    "retrieval",
+    "query",
+    "source",
+    "sources",
+    "sciverse",
+    "academic",
+    "rag",
+    "lightrag",
+    "graphrag",
+    "rag-anything",
+    "retrieval augmented generation",
+    "the",
+    "we",
+    "our",
+    "this",
+    "these",
+    "that",
+    "those",
+    "unknown",
+    "experiment",
+    "experiments",
+    "bleu",
+    "wmt",
+    "english-to-german",
+    "english-to-french",
+}
+
+NOISE_TAGS = {
+    "source",
+    "local",
+    "web",
+    "paper",
+    "article",
+    "note",
+    "dataset",
+    "video",
+    "sciverse",
+    "academic",
+    "rag",
+    "lightrag",
+    "graphrag",
+    "rag-anything",
+    "inbox",
+    "active",
+    "preview",
+    "validation",
 }
 
 BAD_TERM_MARKERS = (
+    "与早期",
+    "如果说",
+    "或者",
+    "只要",
+    "去年大家",
+    "试图把",
+    "真正写过",
+    "触碰到",
+    "落地天花板",
+    "单纯的",
     "我们",
     "文章",
     "然后",
@@ -54,6 +144,33 @@ BAD_TERM_MARKERS = (
     "而非",
     "当前",
     "需要",
+    "已登记",
+    "既然",
+    "而为了解决",
+    "但想用",
+    "能发挥",
+    "几乎都是",
+    "关于",
+    "什么是",
+    "小规模",
+    "Sciverse",
+    "Retrieval query",
+    "Doc ID",
+    "Authors",
+    "Score",
+    "Offset",
+)
+
+BAD_TERM_PREFIXES = (
+    "与",
+    "如果",
+    "或者",
+    "只要",
+    "于是",
+    "而是",
+    "这个",
+    "这种",
+    "那些",
 )
 
 KNOWN_TERMS = [
@@ -86,6 +203,11 @@ CHINESE_TERM_PATTERN = re.compile(
 
 ENGLISH_TERM_PATTERN = re.compile(
     r"\b(?:[A-Z][A-Za-z0-9+-]{1,}|[A-Z]{2,})(?:[- ][A-Z][A-Za-z0-9+-]{1,}){0,4}\b"
+)
+
+METADATA_LINE_PATTERN = re.compile(
+    r"^\s*(?:Title|Doc ID|Authors?|Auth|Year|Venue|DOI|Score|Retrieval query|Offset)\s*:",
+    re.IGNORECASE,
 )
 
 RELATION_HINTS = [
@@ -170,18 +292,67 @@ def title_without_prefix(title: str) -> str:
     return re.sub(r"^Source\s*-\s*", "", title).strip()
 
 
+def term_key(term: str) -> str:
+    return re.sub(r"[\s_]+", " ", term.strip().lower()).strip()
+
+
+def is_noise_term(term: str) -> bool:
+    key = term_key(term)
+    slug = slugify(term)
+    return key in NOISE_TERMS or slug in NOISE_TERMS
+
+
+def is_bad_phrase_term(term: str) -> bool:
+    cleaned = term.strip()
+    if cleaned in KNOWN_TERMS:
+        return False
+    if cleaned.startswith(BAD_TERM_PREFIXES):
+        return True
+    if any(marker in cleaned for marker in BAD_TERM_MARKERS):
+        return True
+    if "的" in cleaned and len(cleaned) >= 6 and cleaned not in {"大语言模型", "语言模型"}:
+        return True
+    if re.search(r"(很快|已经|正在|去年|今年|大家|企业|核心业务|简单草图|残酷)", cleaned):
+        return True
+    return False
+
+
+def clean_evidence_for_concepts(text: str) -> str:
+    cleaned_lines: list[str] = []
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            cleaned_lines.append("")
+            continue
+        bullet = re.sub(r"^\s*[-*]\s+", "", line)
+        if METADATA_LINE_PATTERN.match(bullet):
+            continue
+        if bullet in {"Sciverse academic retrieval result.", "Sciverse academic retrieval result"}:
+            continue
+        if "Sciverse 学术检索导入" in bullet:
+            continue
+        if bullet.lower().startswith("retrieval query:"):
+            continue
+        if bullet.lower().startswith("excerpt:"):
+            bullet = bullet.split(":", 1)[1].strip()
+            if not bullet:
+                continue
+        cleaned_lines.append(bullet)
+    return "\n".join(cleaned_lines).strip()
+
+
 def candidate_terms(title: str, evidence: str, tags: list[str], domain_slug: str, domain_label: str) -> list[str]:
     terms: list[str] = []
 
     def add(term: str) -> None:
         cleaned = term.strip(" ：:，,。！？!?；;（）()「」『』[]【】“”\"'")
-        if not cleaned or cleaned in STOPWORDS:
+        if not cleaned or cleaned in STOPWORDS or is_noise_term(cleaned):
             return
-        if cleaned not in KNOWN_TERMS and any(marker in cleaned for marker in BAD_TERM_MARKERS):
-            return
-        if cleaned not in KNOWN_TERMS and "的" in cleaned and len(cleaned) > 8:
+        if is_bad_phrase_term(cleaned):
             return
         if cleaned == domain_slug or cleaned == "source":
+            return
+        if cleaned == domain_label:
             return
         if len(cleaned) < 2:
             return
@@ -195,7 +366,8 @@ def candidate_terms(title: str, evidence: str, tags: list[str], domain_slug: str
     for term in CHINESE_TERM_PATTERN.findall(evidence):
         add(term)
     for term in ENGLISH_TERM_PATTERN.findall(f"{title} {evidence}"):
-        add(term)
+        if term in KNOWN_TERMS:
+            add(term)
 
     for raw_part in re.split(r"[：:，,、/ -]+", title_without_prefix(title)):
         if "Transformer" in raw_part:
@@ -204,7 +376,7 @@ def candidate_terms(title: str, evidence: str, tags: list[str], domain_slug: str
             add(raw_part)
 
     for tag in tags:
-        if tag not in {"source", domain_slug}:
+        if tag not in NOISE_TAGS and tag != domain_slug:
             add(tag)
     add(domain_label)
 
@@ -530,6 +702,7 @@ def ingest_concepts(
         ]
         if part.strip()
     )
+    evidence = clean_evidence_for_concepts(evidence)
     if not evidence.strip():
         return {"source": str(summary_path.relative_to(ROOT)), "concepts": [], "relations": []}
 
