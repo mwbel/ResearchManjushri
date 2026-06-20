@@ -15,7 +15,7 @@ import uuid
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlencode, urlparse
+from urllib.parse import parse_qs, unquote, urlencode, urlparse
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -28,6 +28,8 @@ WIKI = ROOT / "wiki"
 DOMAIN_PAGES = WIKI / "domains"
 WIKI_CONCEPTS = WIKI / "concepts"
 WIKI_SOURCES = WIKI / "sources"
+CONCEPT_ARCHIVE = WIKI / ".archive" / "concepts"
+CONCEPT_ARCHIVE_LOG = WIKI / ".archive" / "concept-actions.jsonl"
 DELETED_DOMAINS_FILE = ROOT / ".llm-wiki-deleted-domains.json"
 MAX_UPLOAD_BYTES = 120 * 1024 * 1024
 SCIVERSE_BASE_URL = os.environ.get("SCIVERSE_BASE_URL", "https://api.sciverse.space").rstrip("/")
@@ -35,6 +37,9 @@ SCIVERSE_KEYCHAIN_SERVICE = os.environ.get("SCIVERSE_KEYCHAIN_SERVICE", "llm-wik
 
 sys.path.insert(0, str(SCRIPT_DIR))
 import auto_ingest as auto_ingest_lib  # noqa: E402
+import mvp_concept_reviews  # noqa: E402
+import mvp_ingest_artifacts as mvp_artifacts  # noqa: E402
+from mvp_ingest_runner import run_mvp_ingest  # noqa: E402
 from new_source import build_content, infer_source_type, parse_extra_tags, resolve_domain, slugify  # noqa: E402
 
 
@@ -460,6 +465,20 @@ def run_ingest_pipeline(source_path: str, payload: dict) -> tuple[list[dict], st
     return actions, summary_path
 
 
+def run_mvp_ingest_pipeline(source_path: str, payload: dict) -> tuple[list[dict], str, dict]:
+    overwrite = bool(payload.get("overwrite_ingest", True))
+    result = run_mvp_ingest(source_path, overwrite=overwrite)
+    summary_path = clean_text(result.get("wiki_source_path"))
+    action = {
+        "command": f"mvp_ingest {source_path}",
+        "returncode": 0 if result.get("ok") else 1,
+        "stdout": json.dumps(result, ensure_ascii=False),
+        "stderr": clean_text(result.get("error")),
+        "ok": bool(result.get("ok")),
+    }
+    return [action], summary_path, result
+
+
 def clean_text(value: object) -> str:
     return str(value or "").strip()
 
@@ -484,6 +503,98 @@ def unique_path(path: Path) -> Path:
         if not candidate.exists():
             return candidate
         counter += 1
+
+
+def iso_timestamp() -> str:
+    return dt.datetime.now().replace(microsecond=0).isoformat()
+
+
+def archive_id() -> str:
+    return dt.datetime.now().strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:8]
+
+
+def append_concept_archive_log(record: dict) -> None:
+    CONCEPT_ARCHIVE_LOG.parent.mkdir(parents=True, exist_ok=True)
+    with CONCEPT_ARCHIVE_LOG.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
+
+
+def archive_concept_page(path: Path, action: str, reason: str = "", extra: dict | None = None) -> dict:
+    if not path.exists():
+        raise FileNotFoundError(path)
+    meta = parse_frontmatter(path)
+    record_id = archive_id()
+    CONCEPT_ARCHIVE.mkdir(parents=True, exist_ok=True)
+    archived_path = unique_path(CONCEPT_ARCHIVE / f"{record_id}-{path.name}")
+    original_rel = str(path.relative_to(ROOT))
+    archived_rel = str(archived_path.relative_to(ROOT))
+    domains = [tag for tag in parse_inline_list(meta.get("tags")) if tag != "auto-concept"]
+    record = {
+        "id": record_id,
+        "created_at": iso_timestamp(),
+        "action": action,
+        "reason": reason,
+        "label": meta.get("title") or path.stem,
+        "original_path": original_rel,
+        "archived_path": archived_rel,
+        "domains": domains,
+        "sources": parse_inline_list(meta.get("sources")),
+        "extra": extra or {},
+    }
+    path.replace(archived_path)
+    (CONCEPT_ARCHIVE / f"{record_id}.json").write_text(
+        json.dumps(record, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    append_concept_archive_log(record)
+    return record
+
+
+def concept_archive_record(record_id: str) -> dict:
+    safe_id = re.sub(r"[^A-Za-z0-9_-]", "", record_id)
+    if not safe_id:
+        raise ValueError("缺少 archive id")
+    record_path = CONCEPT_ARCHIVE / f"{safe_id}.json"
+    if not record_path.exists():
+        raise FileNotFoundError(record_id)
+    return json.loads(record_path.read_text(encoding="utf-8"))
+
+
+def recent_concept_archives(limit: int = 12) -> list[dict]:
+    if not CONCEPT_ARCHIVE.exists():
+        return []
+    records: list[dict] = []
+    for record_path in CONCEPT_ARCHIVE.glob("*.json"):
+        try:
+            records.append(json.loads(record_path.read_text(encoding="utf-8")))
+        except json.JSONDecodeError:
+            continue
+    records.sort(key=lambda item: item.get("created_at", ""), reverse=True)
+    return records[:limit]
+
+
+def restore_concept_archive_record(record_id: str) -> dict:
+    record = concept_archive_record(record_id)
+    archived_path = (ROOT / record["archived_path"]).resolve()
+    if not archived_path.exists():
+        raise FileNotFoundError(record["archived_path"])
+    original_path = (ROOT / record["original_path"]).resolve()
+    if WIKI_CONCEPTS.resolve() not in original_path.parents:
+        raise ValueError("archive 记录的原路径不在 wiki/concepts 下")
+    original_path.parent.mkdir(parents=True, exist_ok=True)
+    restored_path = unique_path(original_path)
+    archived_path.replace(restored_path)
+    restored = {
+        **record,
+        "restored_at": iso_timestamp(),
+        "restored_path": str(restored_path.relative_to(ROOT)),
+    }
+    (CONCEPT_ARCHIVE / f"{record['id']}.json").write_text(
+        json.dumps(restored, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    append_concept_archive_log({"event": "restore", **restored})
+    return restored
 
 
 def remove_empty_parents(path: Path, stop: Path) -> None:
@@ -678,9 +789,13 @@ def create_source(payload: dict, dry_run: bool = False) -> dict:
 
     actions: list[dict] = []
     summary_path = ""
+    ingest_result: dict | None = None
     domain_slug = meta["domain_slug"]
     if not dry_run and payload.get("auto_ingest", False):
-        actions, summary_path = run_ingest_pipeline(meta["relative_path"], payload)
+        actions, summary_path, ingest_result = run_mvp_ingest_pipeline(
+            meta["relative_path"],
+            {**payload, "overwrite_ingest": True},
+        )
     elif not dry_run:
         if payload.get("rebuild_domain", True):
             actions.append(shell_run(["python3", "scripts/rebuild_domain_network.py", "--domain", domain_slug]))
@@ -695,6 +810,7 @@ def create_source(payload: dict, dry_run: bool = False) -> dict:
         "path": meta["relative_path"],
         "domain": domain_slug,
         "summary": summary_path,
+        "ingest_result": ingest_result,
         "content": content if dry_run else "",
         "actions": actions,
     }
@@ -712,13 +828,17 @@ def update_source_domain(payload: dict) -> dict:
     if old_domain == new_domain:
         meta = parse_frontmatter(old_path)
         write_frontmatter(old_path, {"domain": new_domain, "domain_label": new_label})
-        actions, summary_path = run_ingest_pipeline(str(old_path.relative_to(ROOT)), {**payload, "overwrite_ingest": True})
+        actions, summary_path, ingest_result = run_mvp_ingest_pipeline(
+            str(old_path.relative_to(ROOT)),
+            {**payload, "overwrite_ingest": True},
+        )
         return {
             "ok": all(action["ok"] for action in actions),
             "path": str(old_path.relative_to(ROOT)),
             "old_domain": old_domain,
             "new_domain": new_domain,
             "summary": summary_path,
+            "ingest_result": ingest_result,
             "actions": actions,
         }
 
@@ -748,7 +868,7 @@ def update_source_domain(payload: dict) -> dict:
     old_path.replace(target)
     remove_empty_parents(old_path.parent, RAW_SOURCES / old_domain)
 
-    actions, summary_path = run_ingest_pipeline(
+    actions, summary_path, ingest_result = run_mvp_ingest_pipeline(
         str(target.relative_to(ROOT)),
         {
             **payload,
@@ -770,6 +890,7 @@ def update_source_domain(payload: dict) -> dict:
         "old_domain": old_domain,
         "new_domain": new_domain,
         "summary": summary_path,
+        "ingest_result": ingest_result,
         "actions": actions,
     }
 
@@ -1030,6 +1151,7 @@ def recent_sources(limit: int = 12) -> dict:
     rows = []
     for path in files[:limit]:
         meta = parse_frontmatter(path)
+        ingest_preview = mvp_ingest_preview(path)
         rows.append(
             {
                 "title": meta.get("title") or path.stem,
@@ -1037,6 +1159,8 @@ def recent_sources(limit: int = 12) -> dict:
                 "kind": meta.get("kind") or "source",
                 "status": meta.get("status") or "unknown",
                 "path": str(path.relative_to(ROOT)),
+                "source_id": ingest_preview["source_id"],
+                "ingest": ingest_preview,
                 "source_url": meta.get("source_url") or "",
                 "local_path": meta.get("local_path") or "",
             }
@@ -1067,11 +1191,50 @@ def source_summary_paths_for_raw(raw_rel: str) -> list[Path]:
     return matches
 
 
+def mvp_ingest_preview(path: Path) -> dict:
+    try:
+        source_id = mvp_artifacts.source_id_for_path(path)
+    except Exception:
+        return {
+            "source_id": "",
+            "status": None,
+            "summary": None,
+            "concept_candidates": [],
+        }
+
+    status = mvp_artifacts.read_status(source_id)
+    summary = None
+    concepts: list[dict] = []
+    try:
+        summary = mvp_artifacts.read_json_artifact(source_id, "source_summary")
+    except Exception:
+        summary = None
+    try:
+        concept_payload = mvp_artifacts.read_json_artifact(source_id, "concept_candidates")
+        concepts = list(concept_payload.get("concept_candidates") or [])
+    except Exception:
+        concepts = []
+    try:
+        concept_reviews = mvp_concept_reviews.merged_candidates(source_id)
+    except Exception:
+        concept_reviews = None
+
+    return {
+        "source_id": source_id,
+        "status": status,
+        "artifact_updated_at": mvp_artifacts.artifact_updated_at(source_id),
+        "summary": summary,
+        "concept_candidates": concepts[:10],
+        "concept_reviews": concept_reviews,
+    }
+
+
 def source_row(path: Path, include_body: bool = False) -> dict:
     meta, body = parse_frontmatter_and_body(path)
     sections = extract_body_sections(body)
     raw_rel = str(path.relative_to(ROOT))
     summaries = source_summary_paths_for_raw(raw_rel)
+    ingest_preview = mvp_ingest_preview(path)
     row = {
         "title": meta.get("title") or path.stem,
         "domain": meta.get("domain") or raw_source_domain(path),
@@ -1086,6 +1249,8 @@ def source_row(path: Path, include_body: bool = False) -> dict:
         "created": meta.get("created") or "",
         "tags": ", ".join(tag for tag in parse_inline_list(meta.get("tags")) if tag != (meta.get("domain") or "")),
         "path": raw_rel,
+        "source_id": ingest_preview["source_id"],
+        "ingest": ingest_preview,
         "summary_paths": [str(summary.relative_to(ROOT)) for summary in summaries],
     }
     if include_body:
@@ -1175,11 +1340,12 @@ def update_source(payload: dict) -> dict:
 
     actions: list[dict] = []
     summary_path = ""
+    ingest_result: dict | None = None
     pipeline_payload = {**payload, "overwrite_ingest": True}
     if source_type == "sciverse":
         pipeline_payload["concept_network"] = False
     if payload.get("auto_ingest", True):
-        actions, summary_path = run_ingest_pipeline(str(path.relative_to(ROOT)), pipeline_payload)
+        actions, summary_path, ingest_result = run_mvp_ingest_pipeline(str(path.relative_to(ROOT)), pipeline_payload)
     else:
         if payload.get("rebuild_domain", True):
             actions.append(shell_run(["python3", "scripts/rebuild_domain_network.py", "--domain", domain_slug]))
@@ -1192,6 +1358,7 @@ def update_source(payload: dict) -> dict:
         "ok": all(action["ok"] for action in actions) if actions else True,
         "path": str(path.relative_to(ROOT)),
         "summary": summary_path,
+        "ingest_result": ingest_result,
         "actions": actions,
     }
 
@@ -1333,6 +1500,7 @@ def auto_supplement_source(payload: dict) -> dict:
 def cleanup_concepts_for_deleted_sources(summary_paths: list[Path], delete_orphans: bool = True) -> dict:
     changed_pages: list[str] = []
     deleted_pages: list[str] = []
+    archived_pages: list[dict] = []
     cleaned_relation_refs: list[str] = []
     deleted_refs = {str(path.relative_to(ROOT)) for path in summary_paths}
     deleted_refs.update(path.name for path in summary_paths)
@@ -1349,8 +1517,9 @@ def cleanup_concepts_for_deleted_sources(summary_paths: list[Path], delete_orpha
         label = meta.get("title") or path.stem
 
         if is_orphan_auto_concept:
-            path.unlink()
+            archive = archive_concept_page(path, "delete_orphan", "source summary was deleted")
             deleted_pages.append(str(path.relative_to(ROOT)))
+            archived_pages.append(archive)
             cleaned_relation_refs.extend(remove_concept_relation_refs(label))
             continue
 
@@ -1374,6 +1543,7 @@ def cleanup_concepts_for_deleted_sources(summary_paths: list[Path], delete_orpha
     return {
         "changed_pages": sorted(set(changed_pages)),
         "deleted_pages": sorted(set(deleted_pages)),
+        "archived_pages": archived_pages,
         "cleaned_relation_refs": sorted(set(cleaned_relation_refs)),
     }
 
@@ -1382,6 +1552,7 @@ def cleanup_concepts_for_deleted_domain(domain_slug: str, summary_paths: list[Pa
     cleaned = cleanup_concepts_for_deleted_sources(summary_paths, delete_orphans=True)
     changed_pages = set(cleaned.get("changed_pages", []))
     deleted_pages = set(cleaned.get("deleted_pages", []))
+    archived_pages = list(cleaned.get("archived_pages", []))
     cleaned_relation_refs = set(cleaned.get("cleaned_relation_refs", []))
 
     for path in WIKI_CONCEPTS.glob("*.md"):
@@ -1399,8 +1570,9 @@ def cleanup_concepts_for_deleted_domain(domain_slug: str, summary_paths: list[Pa
         domain_tags = [tag for tag in remaining_tags if tag != "auto-concept"]
         label = meta.get("title") or path.stem
         if "auto-concept" in tags and not domain_tags:
-            path.unlink()
+            archive = archive_concept_page(path, "delete_domain_orphan", f"domain {domain_slug} was deleted")
             deleted_pages.add(rel)
+            archived_pages.append(archive)
             cleaned_relation_refs.update(remove_concept_relation_refs(label))
             continue
 
@@ -1412,6 +1584,7 @@ def cleanup_concepts_for_deleted_domain(domain_slug: str, summary_paths: list[Pa
     return {
         "changed_pages": sorted(changed_pages - deleted_pages),
         "deleted_pages": sorted(deleted_pages),
+        "archived_pages": archived_pages,
         "cleaned_relation_refs": sorted(cleaned_relation_refs),
     }
 
@@ -1540,7 +1713,7 @@ def wiki_source_files() -> list[Path]:
         return []
     return sorted(
         path
-        for path in WIKI_SOURCES.glob("*.md")
+        for path in WIKI_SOURCES.rglob("*.md")
         if path.name.lower() != "readme.md" and not path.name.startswith(".")
     )
 
@@ -1591,15 +1764,27 @@ NOISE_CONCEPT_TERMS = {
 }
 
 CORE_CONCEPT_TERMS = {
+    "ai",
     "attention mechanism",
     "attention mechanisms",
     "attention mechanism 注意力机制",
+    "bp",
     "large language model",
     "large language models",
     "llm",
+    "nli",
+    "noise leading in",
     "self attention",
     "transformer",
     "transformers",
+    "人工智能",
+    "不完全的归纳法",
+    "大语言模型",
+    "归纳法",
+    "知识论",
+    "真信念且证成",
+    "结构化的噪声引入",
+    "语言模型",
     "大语言模型",
     "注意力机制",
     "自注意力",
@@ -1630,6 +1815,13 @@ BAD_CONCEPT_PHRASE_PREFIXES = (
     "如果",
     "或者",
     "只要",
+    "你",
+    "过去",
+    "随着",
+    "对",
+    "几个",
+    "一些",
+    "这些",
     "于是",
     "而是",
     "这个",
@@ -1640,6 +1832,17 @@ BAD_CONCEPT_PHRASE_PREFIXES = (
 BAD_CONCEPT_PHRASE_MARKERS = (
     "与早期",
     "如果说",
+    "或Gemini",
+    "等大语言模型",
+    "几个",
+    "几个人工智能模型",
+    "一次解决",
+    "成千上万",
+    "你可以",
+    "过去数学家",
+    "这些模型",
+    "随着AI模型",
+    "对AI模型",
     "或者",
     "只要",
     "去年大家",
@@ -1651,6 +1854,143 @@ BAD_CONCEPT_PHRASE_MARKERS = (
     "简单草图",
     "核心业务",
 )
+
+CONCEPT_ALIAS_GROUPS = [
+    ["AI", "人工智能", "Artificial Intelligence"],
+    ["LLM", "大语言模型", "Large Language Model", "Large Language Models"],
+    ["注意力机制", "Attention Mechanism", "Attention Mechanisms"],
+    ["NLI", "Noise Leading In", "结构化的噪声引入"],
+]
+
+CONCEPT_DEFINITION_OVERRIDES = {
+    "ai": "AI（人工智能）是研究和构造能够执行感知、推理、生成、规划或行动等智能任务的计算系统与方法。",
+    "人工智能": "人工智能（AI）是研究和构造能够执行感知、推理、生成、规划或行动等智能任务的计算系统与方法。",
+    "llm": "LLM（大语言模型）是以大规模文本和代码数据训练的语言模型，能够根据上下文生成、理解和转换自然语言或程序文本。",
+    "大语言模型": "大语言模型（LLM）是以大规模文本和代码数据训练的语言模型，能够根据上下文生成、理解和转换自然语言或程序文本。",
+    "transformer": "Transformer 是一种以注意力机制为核心的神经网络架构，用来在序列内部直接建模不同位置之间的依赖关系。",
+    "注意力机制": "注意力机制是一类让模型按上下文动态分配信息权重的方法，用于突出当前任务最相关的输入位置或表示。",
+    "attention mechanism": "Attention Mechanism（注意力机制）是一类让模型按上下文动态分配信息权重的方法，用于突出当前任务最相关的输入位置或表示。",
+    "语言模型": "语言模型是估计文本序列概率或生成下一个文本单元的模型，是现代自然语言处理和大语言模型的基础。",
+}
+
+CONCEPT_RELATION_PATTERN = re.compile(r"^-\s+`([^`]+)`\s+--(.+?)-->\s+`([^`]+)`(?:\s+\((.+)\))?")
+
+
+def alias_group_for(label: str) -> list[str]:
+    normalized = normalize_concept_term(label)
+    for group in CONCEPT_ALIAS_GROUPS:
+        if any(normalize_concept_term(item) == normalized for item in group):
+            return group
+    return []
+
+
+def alias_candidates_for(label: str) -> list[str]:
+    normalized = normalize_concept_term(label)
+    return [item for item in alias_group_for(label) if normalize_concept_term(item) != normalized]
+
+
+def alias_target_for(title: str, current_slug: str, catalog_by_slug: dict[str, dict]) -> dict | None:
+    group = alias_group_for(title)
+    if not group:
+        return None
+    current_norm = normalize_concept_term(title)
+    by_norm = {
+        normalize_concept_term(item["label"]): item
+        for item in catalog_by_slug.values()
+        if item.get("label")
+    }
+    for candidate in group:
+        candidate_norm = normalize_concept_term(candidate)
+        item = by_norm.get(candidate_norm)
+        if item and item.get("slug") != current_slug and candidate_norm != current_norm:
+            return item
+    for item in catalog_by_slug.values():
+        if item.get("slug") != current_slug and normalize_concept_term(item.get("label", "")) in {
+            normalize_concept_term(candidate) for candidate in group
+        }:
+            return item
+    return None
+
+
+def markdown_list_items(body: str, heading: str, limit: int = 4) -> list[str]:
+    section = markdown_section(body, heading)
+    items: list[str] = []
+    for line in section.splitlines():
+        text = line.strip()
+        if not text.startswith("- "):
+            continue
+        cleaned = text[2:].strip()
+        if cleaned and cleaned not in items:
+            items.append(cleaned)
+        if len(items) >= limit:
+            break
+    return items
+
+
+def strip_markdown_inline(value: str) -> str:
+    text = re.sub(r"`([^`]+)`", r"\1", value)
+    text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
+    text = re.sub(r"\s+", " ", text)
+    return text.strip()
+
+
+def evidence_source_labels(body: str, limit: int = 4) -> list[str]:
+    labels: list[str] = []
+    for item in markdown_list_items(body, "## Source-Derived Evidence", limit=20):
+        match = re.match(r"\[([^\]]+)\]\([^)]+\)", item)
+        label = match.group(1).strip() if match else ""
+        if label and label not in labels:
+            labels.append(label)
+        if len(labels) >= limit:
+            break
+    return labels
+
+
+def concept_lead_definition(title: str, summary: str, body: str, domain_label: str) -> str:
+    normalized = normalize_concept_term(title)
+    if normalized in CONCEPT_DEFINITION_OVERRIDES:
+        return CONCEPT_DEFINITION_OVERRIDES[normalized]
+    for alias in alias_candidates_for(title):
+        alias_norm = normalize_concept_term(alias)
+        if alias_norm in CONCEPT_DEFINITION_OVERRIDES:
+            return CONCEPT_DEFINITION_OVERRIDES[alias_norm]
+    definition_items = markdown_list_items(body, "## Working Definition", limit=1)
+    if definition_items:
+        text = strip_markdown_inline(definition_items[0])
+        text = re.sub(r"^在资料《.+?》中，(.+?) 的当前工作性理解来自这条摘录：", f"{title}：", text)
+        text = re.sub(r"^(.+?) 是从资料《.+?》中抽取出的候选概念；", f"{title} 是一个来自资料抽取的候选概念；", text)
+        if text:
+            return text
+    if summary:
+        return strip_markdown_inline(summary)
+    return f"{title} 是 {domain_label or '当前学科'} 知识网络中的概念页；它的定义、边界和证据仍可继续整理。"
+
+
+def concept_introduction_reason(meta: dict[str, str], body: str) -> str:
+    sources = evidence_source_labels(body, 2)
+    if sources:
+        return f"由资料《{'》《'.join(sources)}》中的摘录或关系自动引入。"
+    source_paths = parse_inline_list(meta.get("sources"))
+    if source_paths:
+        return f"由 {len(source_paths)} 条 source-derived 记录自动引入。"
+    return "由自动抽取流程引入，当前缺少明确证据来源。"
+
+
+def concept_relation_ref_pages(label: str) -> list[str]:
+    refs: list[str] = []
+    label_slug = slugify(label)
+    for path in WIKI_CONCEPTS.glob("*.md"):
+        if not path.exists():
+            continue
+        for line in path.read_text(encoding="utf-8").splitlines():
+            match = CONCEPT_RELATION_PATTERN.match(line.strip())
+            if not match:
+                continue
+            source, _, target, _ = match.groups()
+            if slugify(source) == label_slug or slugify(target) == label_slug:
+                refs.append(str(path.relative_to(ROOT)))
+                break
+    return sorted(set(refs))
 
 
 def markdown_section(body: str, heading: str) -> str:
@@ -1749,6 +2089,7 @@ def concept_organize_action(path: Path, domain_slug: str, catalog_by_slug: dict[
     is_auto = "auto-concept" in tags
     is_curated = "curated-concept" in tags
     noise_reason = concept_noise_reason(title)
+    relation_ref_pages = concept_relation_ref_pages(title)
     base = {
         "slug": path.stem,
         "title": title,
@@ -1756,6 +2097,10 @@ def concept_organize_action(path: Path, domain_slug: str, catalog_by_slug: dict[
         "evidence_count": evidence_count,
         "relation_count": relation_count,
         "review_reason": reason,
+        "introduced_by": concept_introduction_reason(meta, body),
+        "evidence_sources": evidence_source_labels(body),
+        "evidence_preview": [strip_markdown_inline(item) for item in markdown_list_items(body, "## Source-Derived Evidence", 2)],
+        "alias_candidates": alias_candidates_for(title),
         "auto_concept": is_auto,
         "curated_concept": is_curated,
     }
@@ -1766,6 +2111,7 @@ def concept_organize_action(path: Path, domain_slug: str, catalog_by_slug: dict[
             "confidence": "high",
             "reason": "已保留为正式概念，不需要进入自动整理队列",
             "apply": False,
+            "affected_files": [str(path.relative_to(ROOT))],
         }
 
     if is_auto and noise_reason:
@@ -1775,6 +2121,21 @@ def concept_organize_action(path: Path, domain_slug: str, catalog_by_slug: dict[
             "confidence": "high",
             "reason": noise_reason,
             "apply": True,
+            "affected_files": sorted(set([str(path.relative_to(ROOT)), *relation_ref_pages])),
+        }
+
+    alias_target = alias_target_for(title, path.stem, catalog_by_slug)
+    if alias_target:
+        target_path = clean_text(alias_target.get("path"))
+        return {
+            **base,
+            "action": "merge_suggested",
+            "confidence": "high",
+            "reason": f"疑似同义词、缩写或中英翻译别名，建议并入“{alias_target['label']}”并作为 alias 保留",
+            "target_slug": alias_target["slug"],
+            "target_title": alias_target["label"],
+            "apply": False,
+            "affected_files": sorted(set([str(path.relative_to(ROOT)), target_path, *relation_ref_pages])),
         }
 
     singular = singular_candidate(title)
@@ -1788,6 +2149,7 @@ def concept_organize_action(path: Path, domain_slug: str, catalog_by_slug: dict[
             "target_slug": target["slug"],
             "target_title": target["label"],
             "apply": False,
+            "affected_files": sorted(set([str(path.relative_to(ROOT)), clean_text(target.get("path")), *relation_ref_pages])),
         }
 
     if is_auto and evidence_count >= 2 and relation_count >= 1 and "暂无与该概念直接匹配" not in body:
@@ -1797,6 +2159,7 @@ def concept_organize_action(path: Path, domain_slug: str, catalog_by_slug: dict[
             "confidence": "medium",
             "reason": "已有证据和关系，可先保留为独立概念并移出待整理队列",
             "apply": True,
+            "affected_files": [str(path.relative_to(ROOT))],
         }
 
     return {
@@ -1805,6 +2168,7 @@ def concept_organize_action(path: Path, domain_slug: str, catalog_by_slug: dict[
         "confidence": "low",
         "reason": reason or "证据或关系不足，需要人工判断是否保留",
         "apply": False,
+        "affected_files": [str(path.relative_to(ROOT))],
     }
 
 
@@ -1901,9 +2265,9 @@ def organize_concepts(payload: dict) -> dict:
             if action["action"] == "delete_noise" and action.get("apply"):
                 meta = parse_frontmatter(path)
                 label = meta.get("title") or path.stem
-                path.unlink()
+                archive = archive_concept_page(path, "delete_noise", clean_text(action.get("reason")))
                 cleaned_refs = remove_concept_relation_refs(label)
-                applied.append({**action, "deleted": True, "cleaned_refs": cleaned_refs})
+                applied.append({**action, "deleted": True, "archive": archive, "cleaned_refs": cleaned_refs})
             elif action["action"] == "promote" and action.get("apply"):
                 updated_path = promote_concept(path, domain_slug)
                 applied.append({**action, "updated": updated_path})
@@ -1963,11 +2327,12 @@ def concept_decision(payload: dict) -> dict:
             "label": label,
         }
     else:
-        path.unlink()
+        archive = archive_concept_page(path, decision, f"manual decision: {decision}")
         cleaned_refs = remove_concept_relation_refs(label)
         result = {
             "decision": "delete",
             "deleted": str(path.relative_to(ROOT)),
+            "archive": archive,
             "label": label,
             "cleaned_refs": cleaned_refs,
         }
@@ -1983,6 +2348,69 @@ def concept_decision(payload: dict) -> dict:
         "ok": all(action["ok"] for action in actions),
         "domain": domain_slug,
         **result,
+        "actions": actions,
+    }
+
+
+def rebuild_after_concept_change(domains: list[str], payload: dict) -> list[dict]:
+    actions: list[dict] = []
+    if payload.get("rebuild_domain", True):
+        for domain in sorted(set(domain for domain in domains if domain)):
+            actions.append(shell_run(["python3", "scripts/rebuild_domain_network.py", "--domain", domain]))
+    if payload.get("rebuild_index", True):
+        actions.append(shell_run(["python3", "scripts/rebuild_index.py"]))
+    if payload.get("run_lint", False):
+        actions.append(shell_run(["python3", "scripts/lint_wiki.py"]))
+    return actions
+
+
+def merge_concept(payload: dict) -> dict:
+    source_slug = clean_text(payload.get("source_slug") or payload.get("slug"))
+    target_slug = clean_text(payload.get("target_slug"))
+    domain_slug = clean_text(payload.get("domain")) or "general"
+    if not source_slug or not target_slug:
+        raise ValueError("合并概念需要 source_slug 和 target_slug")
+    if slugify(source_slug) == slugify(target_slug):
+        raise ValueError("源概念和目标概念不能相同")
+    source_path = concept_file_by_slug(source_slug)
+    target_path = concept_file_by_slug(target_slug)
+    if source_path == target_path:
+        raise ValueError("源概念和目标概念不能相同")
+
+    source_meta = parse_frontmatter(source_path)
+    target_meta = parse_frontmatter(target_path)
+    domains = [
+        tag
+        for tag in [
+            domain_slug,
+            *parse_inline_list(source_meta.get("tags")),
+            *parse_inline_list(target_meta.get("tags")),
+        ]
+        if tag and tag != "auto-concept" and tag != "curated-concept"
+    ]
+    merge_result = merge_concept_pages(
+        source_path,
+        target_path,
+        domain_slug,
+        clean_text(payload.get("reason")) or "manual merge",
+    )
+    actions = rebuild_after_concept_change(domains or [domain_slug], payload)
+    return {
+        "ok": all(action["ok"] for action in actions) if actions else True,
+        "domain": domain_slug,
+        "merge": merge_result,
+        "actions": actions,
+    }
+
+
+def restore_concept_archive(payload: dict) -> dict:
+    record_id = clean_text(payload.get("archive_id") or payload.get("id"))
+    restored = restore_concept_archive_record(record_id)
+    domains = restored.get("domains") or [clean_text(payload.get("domain")) or "general"]
+    actions = rebuild_after_concept_change(domains, payload)
+    return {
+        "ok": all(action["ok"] for action in actions) if actions else True,
+        "restored": restored,
         "actions": actions,
     }
 
@@ -2010,6 +2438,7 @@ def workbench(domain_slug: str | None = None) -> dict:
     raw_files = raw_source_files(domain_slug)
     concept_files = concept_files_for_domain(domain_slug)
     relation_count = count_relations_for_domain(domain_slug)
+    catalog_by_slug = {item["slug"]: item for item in concept_catalog(domain_slug)}
 
     source_queue = []
     for path in wiki_source_files():
@@ -2037,15 +2466,26 @@ def workbench(domain_slug: str | None = None) -> dict:
     concept_queue = []
     for path in concept_files:
         meta, body = parse_frontmatter_and_body(path)
-        reason = concept_review_reason(body)
-        if not reason:
+        action = concept_organize_action(path, domain_slug, catalog_by_slug)
+        if action["action"] == "already_curated":
             continue
         title = meta.get("title") or path.stem
         concept_queue.append(
             {
                 "title": title,
                 "slug": path.stem,
-                "reason": reason,
+                "reason": action["reason"],
+                "action": action["action"],
+                "confidence": action["confidence"],
+                "introduced_by": action.get("introduced_by", ""),
+                "recommended_action": action["action"],
+                "target_slug": action.get("target_slug", ""),
+                "target_title": action.get("target_title", ""),
+                "evidence_count": action.get("evidence_count", 0),
+                "relation_count": action.get("relation_count", 0),
+                "evidence_sources": action.get("evidence_sources", []),
+                "evidence_preview": action.get("evidence_preview", []),
+                "affected_files": action.get("affected_files", []),
                 "summary": meta.get("summary", ""),
                 "updated": meta.get("updated") or meta.get("created") or "",
                 "path": str(path.relative_to(ROOT)),
@@ -2088,6 +2528,7 @@ def concept_catalog(domain_slug: str | None = None) -> list[dict]:
                 "id": slugify(title),
                 "slug": path.stem,
                 "label": title,
+                "aliases": parse_inline_list(meta.get("aliases")),
                 "summary": meta.get("summary") or "",
                 "path": str(path.relative_to(ROOT)),
                 "tags": parse_inline_list(meta.get("tags")),
@@ -2104,6 +2545,8 @@ def concept_file_by_slug(slug: str) -> Path:
     for path in WIKI_CONCEPTS.glob("*.md"):
         meta = parse_frontmatter(path)
         if slugify(meta.get("title") or path.stem) == safe_slug:
+            return path
+        if any(slugify(alias) == safe_slug for alias in parse_inline_list(meta.get("aliases"))):
             return path
     raise FileNotFoundError(slug)
 
@@ -2186,6 +2629,7 @@ def concept_page(slug: str, domain_slug: str | None = None) -> dict:
     meta, body = parse_frontmatter_and_body(path)
     title = meta.get("title") or path.stem
     domain = domain_slug or next((tag for tag in parse_inline_list(meta.get("tags")) if tag != "auto-concept"), "")
+    domain_label = domain_label_for(domain) if domain else ""
     graph = concept_graph(domain) if domain else {"edges": []}
     concept_id = slugify(title)
     related_edges = [
@@ -2193,19 +2637,34 @@ def concept_page(slug: str, domain_slug: str | None = None) -> dict:
         for edge in graph.get("edges", [])
         if edge.get("source") == concept_id or edge.get("target") == concept_id
     ]
+    aliases = parse_inline_list(meta.get("aliases"))
+    for alias in alias_candidates_for(title):
+        if alias and alias not in aliases:
+            aliases.append(alias)
     return {
         "slug": path.stem,
         "id": concept_id,
         "title": title,
+        "lead_definition": concept_lead_definition(title, meta.get("summary") or "", body, domain_label),
         "summary": meta.get("summary") or "",
         "status": meta.get("status") or "",
         "updated": meta.get("updated") or "",
         "tags": parse_inline_list(meta.get("tags")),
+        "aliases": aliases,
         "sources": parse_inline_list(meta.get("sources")),
         "path": str(path.relative_to(ROOT)),
         "body": body,
         "domain": domain,
-        "domain_label": domain_label_for(domain) if domain else "",
+        "domain_label": domain_label,
+        "sections": {
+            "definition": [strip_markdown_inline(item) for item in markdown_list_items(body, "## Working Definition", 4)],
+            "aliases": [strip_markdown_inline(item) for item in markdown_list_items(body, "## Aliases", 12)],
+            "source_evidence": [strip_markdown_inline(item) for item in markdown_list_items(body, "## Source-Derived Evidence", 10)],
+            "academic_evidence": [strip_markdown_inline(item) for item in markdown_list_items(body, "## Academic Evidence", 10)],
+            "relations": [strip_markdown_inline(item) for item in markdown_list_items(body, "## Source-Derived Relations", 12)],
+            "open_questions": [strip_markdown_inline(item) for item in markdown_list_items(body, "## Open Questions", 8)],
+        },
+        "introduced_by": concept_introduction_reason(meta, body),
         "catalog": concept_catalog(domain) if domain else concept_catalog(),
         "related_edges": related_edges,
     }
@@ -2214,13 +2673,12 @@ def concept_page(slug: str, domain_slug: str | None = None) -> dict:
 def remove_concept_relation_refs(label: str) -> list[str]:
     removed_from: list[str] = []
     label_slug = slugify(label)
-    relation_pattern = re.compile(r"^-\s+`([^`]+)`\s+--(.+?)-->\s+`([^`]+)`(?:\s+\((.+)\))?")
     for path in WIKI_CONCEPTS.glob("*.md"):
         lines = path.read_text(encoding="utf-8").splitlines()
         kept: list[str] = []
         changed = False
         for line in lines:
-            match = relation_pattern.match(line.strip())
+            match = CONCEPT_RELATION_PATTERN.match(line.strip())
             if match:
                 source, _, target, _ = match.groups()
                 if slugify(source) == label_slug or slugify(target) == label_slug:
@@ -2231,6 +2689,149 @@ def remove_concept_relation_refs(label: str) -> list[str]:
             path.write_text("\n".join(kept).rstrip() + "\n", encoding="utf-8")
             removed_from.append(str(path.relative_to(ROOT)))
     return removed_from
+
+
+def relation_line_with_labels(line: str, old_label: str, new_label: str) -> tuple[str, bool]:
+    match = CONCEPT_RELATION_PATTERN.match(line.strip())
+    if not match:
+        return line, False
+    source, relation, target, evidence_raw = match.groups()
+    changed = False
+    old_slug = slugify(old_label)
+    if slugify(source) == old_slug:
+        source = new_label
+        changed = True
+    if slugify(target) == old_slug:
+        target = new_label
+        changed = True
+    if not changed:
+        return line, False
+    suffix = f" ({evidence_raw})" if evidence_raw else ""
+    return f"- `{source}` --{relation.strip()}--> `{target}`{suffix}", True
+
+
+def update_concept_relation_label(old_label: str, new_label: str) -> list[str]:
+    changed_pages: list[str] = []
+    for path in WIKI_CONCEPTS.glob("*.md"):
+        lines = path.read_text(encoding="utf-8").splitlines()
+        updated: list[str] = []
+        changed = False
+        for line in lines:
+            rewritten, line_changed = relation_line_with_labels(line, old_label, new_label)
+            updated.append(rewritten)
+            changed = changed or line_changed
+        if changed:
+            path.write_text("\n".join(updated).rstrip() + "\n", encoding="utf-8")
+            changed_pages.append(str(path.relative_to(ROOT)))
+    return sorted(set(changed_pages))
+
+
+def markdown_section_raw_lines(body: str, heading: str) -> list[str]:
+    section = markdown_section(body, heading)
+    return [line.strip() for line in section.splitlines() if line.strip()]
+
+
+def merge_markdown_section_lines(body: str, heading: str, additions: list[str]) -> str:
+    existing = markdown_section_raw_lines(body, heading)
+    merged: list[str] = []
+    for line in [*existing, *additions]:
+        cleaned = line.strip()
+        if cleaned and cleaned not in merged:
+            merged.append(cleaned)
+    return replace_markdown_section(body, heading, merged or ["- 待补：暂无内容。"])
+
+
+def merge_concept_pages(source_path: Path, target_path: Path, domain_slug: str, reason: str = "") -> dict:
+    source_meta, source_body = parse_frontmatter_and_body(source_path)
+    target_meta, target_body = parse_frontmatter_and_body(target_path)
+    source_title = source_meta.get("title") or source_path.stem
+    target_title = target_meta.get("title") or target_path.stem
+    if slugify(source_title) == slugify(target_title):
+        raise ValueError("源概念和目标概念相同")
+
+    existing_aliases = parse_inline_list(target_meta.get("aliases"))
+    source_aliases = parse_inline_list(source_meta.get("aliases"))
+    alias_group = alias_group_for(source_title) or alias_group_for(target_title)
+    aliases: list[str] = []
+    for item in [*existing_aliases, source_title, *source_aliases, *alias_group]:
+        cleaned = clean_text(item)
+        if not cleaned or slugify(cleaned) == slugify(target_title):
+            continue
+        if cleaned not in aliases:
+            aliases.append(cleaned)
+
+    target_sources = parse_inline_list(target_meta.get("sources"))
+    for item in parse_inline_list(source_meta.get("sources")):
+        if item and item not in target_sources:
+            target_sources.append(item)
+
+    target_tags = parse_inline_list(target_meta.get("tags"))
+    for tag in parse_inline_list(source_meta.get("tags")):
+        if tag and tag != "auto-concept" and tag not in target_tags:
+            target_tags.append(tag)
+    if "curated-concept" not in target_tags:
+        target_tags.append("curated-concept")
+
+    target_body = merge_markdown_section_lines(
+        target_body,
+        "## Aliases",
+        [f"- `{alias}`" for alias in aliases],
+    )
+    target_body = merge_markdown_section_lines(
+        target_body,
+        "## Source-Derived Evidence",
+        markdown_section_raw_lines(source_body, "## Source-Derived Evidence"),
+    )
+    relation_additions = []
+    for line in markdown_section_raw_lines(source_body, "## Source-Derived Relations"):
+        rewritten, _ = relation_line_with_labels(line, source_title, target_title)
+        relation_additions.append(rewritten)
+    target_body = merge_markdown_section_lines(target_body, "## Source-Derived Relations", relation_additions)
+    academic_lines = markdown_section_raw_lines(source_body, "## Academic Evidence")
+    if academic_lines:
+        target_body = merge_markdown_section_lines(target_body, "## Academic Evidence", academic_lines)
+
+    target_body = replace_markdown_section(
+        target_body,
+        "## Open Questions",
+        [
+            f"- 已将 `{source_title}` 作为 `{target_title}` 的 alias 合并；后续可继续校正定义边界。",
+            "- 后续可继续补充更精确的定义、边界、反例和跨学科连接。",
+        ],
+    )
+
+    write_frontmatter(
+        target_path,
+        {
+            "updated": dt.date.today().isoformat(),
+            "tags": inline_list(target_tags),
+            "sources": inline_list(target_sources),
+            "aliases": inline_list(aliases),
+        },
+    )
+    frontmatter, _ = split_frontmatter(target_path)
+    target_path.write_text("\n".join([*frontmatter, "", target_body]).rstrip() + "\n", encoding="utf-8")
+
+    updated_refs = update_concept_relation_label(source_title, target_title)
+    archive = archive_concept_page(
+        source_path,
+        "merge",
+        reason or f"merged into {target_title}",
+        {
+            "target_path": str(target_path.relative_to(ROOT)),
+            "target_title": target_title,
+            "aliases_added": aliases,
+        },
+    )
+    return {
+        "source": str(source_path.relative_to(ROOT)),
+        "target": str(target_path.relative_to(ROOT)),
+        "source_title": source_title,
+        "target_title": target_title,
+        "aliases": aliases,
+        "updated_relation_refs": updated_refs,
+        "archive": archive,
+    }
 
 
 def delete_concept(payload: dict) -> dict:
@@ -2245,7 +2846,7 @@ def delete_concept(payload: dict) -> dict:
     if not domains:
         domains = [clean_text(payload.get("domain")) or "general"]
 
-    path.unlink()
+    archive = archive_concept_page(path, "delete_manual", "deleted from concept reader")
     cleaned_refs = remove_concept_relation_refs(label)
     actions = []
     if payload.get("rebuild_domain", True):
@@ -2259,6 +2860,7 @@ def delete_concept(payload: dict) -> dict:
     return {
         "ok": all(action["ok"] for action in actions) if actions else True,
         "deleted": str(path.relative_to(ROOT)),
+        "archive": archive,
         "label": label,
         "cleaned_refs": cleaned_refs,
         "actions": actions,
@@ -2330,6 +2932,59 @@ class WikiWebHandler(BaseHTTPRequestHandler):
             except FileNotFoundError:
                 write_json(self, {"ok": False, "error": f"Concept not found: {slug}"}, HTTPStatus.NOT_FOUND)
             return
+        if parsed.path == "/api/concepts/archive/recent":
+            query = parse_qs(parsed.query)
+            limit = int(query.get("limit", ["12"])[0])
+            write_json(self, {"ok": True, "archives": recent_concept_archives(limit)})
+            return
+        status_match = re.fullmatch(r"/api/sources/([^/]+)/ingest-status", parsed.path)
+        if status_match:
+            source_id = unquote(status_match.group(1))
+            status = mvp_artifacts.read_status(source_id)
+            if not status:
+                write_json(self, {"ok": False, "error": f"Ingest status not found: {source_id}"}, HTTPStatus.NOT_FOUND)
+                return
+            write_json(self, {"ok": True, "status": status})
+            return
+        candidate_match = re.fullmatch(r"/api/sources/([^/]+)/concept-candidates", parsed.path)
+        if candidate_match:
+            source_id = unquote(candidate_match.group(1))
+            try:
+                write_json(self, mvp_concept_reviews.merged_candidates(source_id))
+            except FileNotFoundError:
+                write_json(
+                    self,
+                    {"ok": False, "error": f"Concept candidates not found: {source_id}"},
+                    HTTPStatus.NOT_FOUND,
+                )
+            return
+        accepted_match = re.fullmatch(r"/api/sources/([^/]+)/accepted-concepts", parsed.path)
+        if accepted_match:
+            source_id = unquote(accepted_match.group(1))
+            try:
+                write_json(self, mvp_concept_reviews.project_accepted_concepts(source_id))
+            except FileNotFoundError:
+                write_json(
+                    self,
+                    {"ok": False, "error": f"Concept candidates not found: {source_id}"},
+                    HTTPStatus.NOT_FOUND,
+                )
+            return
+        artifact_match = re.fullmatch(r"/api/sources/([^/]+)/artifacts/([^/]+)", parsed.path)
+        if artifact_match:
+            source_id = unquote(artifact_match.group(1))
+            artifact_type = unquote(artifact_match.group(2))
+            try:
+                write_json(self, mvp_artifacts.artifact_response(source_id, artifact_type))
+            except FileNotFoundError:
+                write_json(
+                    self,
+                    {"ok": False, "error": f"Artifact not found: {source_id}/{artifact_type}"},
+                    HTTPStatus.NOT_FOUND,
+                )
+            except ValueError as exc:
+                write_json(self, {"ok": False, "error": str(exc)}, HTTPStatus.BAD_REQUEST)
+            return
         if parsed.path == "/api/health":
             write_json(self, {"ok": True, "root": str(ROOT)})
             return
@@ -2384,17 +3039,64 @@ class WikiWebHandler(BaseHTTPRequestHandler):
             if parsed.path == "/api/concepts/decision":
                 write_json(self, concept_decision(payload))
                 return
+            if parsed.path == "/api/concepts/merge":
+                write_json(self, merge_concept(payload))
+                return
+            if parsed.path == "/api/concepts/restore":
+                write_json(self, restore_concept_archive(payload))
+                return
+            reingest_match = re.fullmatch(r"/api/sources/([^/]+)/reingest", parsed.path)
+            if reingest_match:
+                source_id = unquote(reingest_match.group(1))
+                source_path = mvp_artifacts.find_source_path(source_id)
+                if not source_path:
+                    write_json(self, {"ok": False, "error": f"Source not found for source_id: {source_id}"}, HTTPStatus.NOT_FOUND)
+                    return
+                result = run_mvp_ingest(str(source_path.relative_to(ROOT)), overwrite=True)
+                try:
+                    result["accepted_concepts"] = mvp_concept_reviews.project_accepted_concepts(source_id)
+                except FileNotFoundError:
+                    pass
+                write_json(self, result)
+                return
+            candidate_action_match = re.fullmatch(
+                r"/api/sources/([^/]+)/concept-candidates/([^/]+)/(accept|reject|rename|note)",
+                parsed.path,
+            )
+            if candidate_action_match:
+                source_id = unquote(candidate_action_match.group(1))
+                candidate_id = unquote(candidate_action_match.group(2))
+                action = unquote(candidate_action_match.group(3))
+                try:
+                    result = mvp_concept_reviews.update_review(
+                        source_id,
+                        candidate_id,
+                        action,
+                        display_name=payload.get("display_name"),
+                        note=payload.get("note"),
+                    )
+                    write_json(self, result)
+                except FileNotFoundError:
+                    write_json(
+                        self,
+                        {"ok": False, "error": f"Concept candidates not found: {source_id}"},
+                        HTTPStatus.NOT_FOUND,
+                    )
+                except LookupError as exc:
+                    write_json(self, {"ok": False, "error": str(exc)}, HTTPStatus.NOT_FOUND)
+                return
             if parsed.path == "/api/ingest":
                 source_path = clean_text(payload.get("path"))
                 if not source_path:
                     raise ValueError("缺少 raw source 路径")
-                actions, summary_path = run_ingest_pipeline(source_path, payload)
+                actions, summary_path, ingest_result = run_mvp_ingest_pipeline(source_path, {**payload, "overwrite_ingest": True})
                 write_json(
                     self,
                     {
                         "ok": all(action["ok"] for action in actions),
                         "path": source_path,
                         "summary": summary_path,
+                        "ingest_result": ingest_result,
                         "actions": actions,
                     },
                 )

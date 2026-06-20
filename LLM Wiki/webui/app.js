@@ -297,12 +297,15 @@ function inlineWikiText(text, currentId = "") {
   });
 
   const concepts = state.conceptCatalog
-    .filter((item) => item.id !== currentId && item.label && item.label.length >= 2)
-    .sort((a, b) => b.label.length - a.label.length)
-    .slice(0, 120);
+    .filter((item) => item.id !== currentId && item.label)
+    .flatMap((item) => [item.label, ...(item.aliases || [])]
+      .filter((label) => label && label.length >= 2)
+      .map((label) => ({ ...item, matchLabel: label })))
+    .sort((a, b) => b.matchLabel.length - a.matchLabel.length)
+    .slice(0, 160);
   if (concepts.length) {
-    const byLabel = new Map(concepts.map((item) => [item.label, item]));
-    const pattern = new RegExp(concepts.map((item) => regexEscape(item.label)).join("|"), "g");
+    const byLabel = new Map(concepts.map((item) => [item.matchLabel, item]));
+    const pattern = new RegExp(concepts.map((item) => regexEscape(item.matchLabel)).join("|"), "g");
     html = html.replace(pattern, (match) => {
       const concept = byLabel.get(match);
       if (!concept) return match;
@@ -355,30 +358,53 @@ function renderMarkdownArticle(markdown, currentId) {
   return html.join("");
 }
 
-function conceptBrief(page) {
-  const title = String(page.title || "").trim().toLowerCase();
-  if (title === "skills" || title === "skill") {
-    return `
-      <section class="concept-brief">
-        <div class="concept-brief-title">简明解释</div>
-        <p>在 AI Agent 语境里，Skill 是一个可被模型按需加载的能力包。它通常把任务说明、步骤、脚本、模板和资源放在一起，让通用 Agent 在遇到特定任务时获得更稳定的执行方式。</p>
-        <ul>
-          <li>它解决的是“怎么完成一类任务”，例如写作、做 PPT、处理表格或调用某套工作流。</li>
-          <li>它和 MCP 不同：MCP 更像工具/数据调用协议，Skill 更像任务方法包和操作手册。</li>
-          <li>放进知识库时，建议把它理解为“Agent 能力封装机制”，而不是某个具体产品名。</li>
-        </ul>
-      </section>
-    `;
-  }
-  if ((page.summary || "").includes("等待人工整理定义")) {
-    return `
-      <section class="concept-brief">
-        <div class="concept-brief-title">待整理概念</div>
-        <p>这个页面目前主要来自自动抽取。下面的证据可以帮助判断它是否值得保留为独立概念，但还需要补充清晰定义、边界和例子。</p>
-      </section>
-    `;
-  }
-  return "";
+function uniqueValues(values) {
+  const seen = new Set();
+  return values.filter((value) => {
+    const text = String(value || "").trim();
+    if (!text || seen.has(text)) return false;
+    seen.add(text);
+    return true;
+  });
+}
+
+function renderPills(items) {
+  const values = uniqueValues(items || []);
+  if (!values.length) return "";
+  return `<div class="wiki-pill-row">${values.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</div>`;
+}
+
+function renderConceptSection(title, items, emptyText = "暂无内容。") {
+  const values = uniqueValues(items || []);
+  return `
+    <section class="wiki-section-card">
+      <h2>${escapeHtml(title)}</h2>
+      ${values.length
+        ? `<ul>${values.map((item) => `<li>${inlineWikiText(item, state.currentConceptPage?.id || "")}</li>`).join("")}</ul>`
+        : `<p class="empty">${escapeHtml(emptyText)}</p>`}
+    </section>
+  `;
+}
+
+function conceptLead(page) {
+  const aliases = uniqueValues([...(page.aliases || []), ...((page.sections || {}).aliases || [])]);
+  return `
+    <section class="wiki-lead">
+      <p>${inlineWikiText(page.lead_definition || page.summary || "暂无定义。", page.id)}</p>
+      ${aliases.length ? `
+        <div class="wiki-aliases">
+          <strong>别名</strong>
+          ${renderPills(aliases)}
+        </div>
+      ` : ""}
+      ${conceptNeedsDecision(page) ? `
+        <div class="wiki-review-note">
+          <strong>待确认</strong>
+          <span>${escapeHtml(page.introduced_by || "自动抽取生成，等待人工确认。")}</span>
+        </div>
+      ` : ""}
+    </section>
+  `;
 }
 
 function isNoisyRelatedConcept(item) {
@@ -418,21 +444,28 @@ function renderConceptActionState(page) {
 }
 
 function renderWikiPage(page) {
-  state.currentConcept = page.id;
+  state.currentConcept = page.slug;
   state.currentConceptPage = page;
   state.conceptCatalog = page.catalog || state.conceptCatalog;
   renderConceptActionState(page);
+  const sections = page.sections || {};
   $("#wikiArticle").innerHTML = `
     <div class="wiki-kicker">${escapeHtml(page.domain_label || page.domain || "Concept")}</div>
     <h1>${escapeHtml(page.title)}</h1>
-    ${conceptBrief(page)}
-    <p class="wiki-summary">${escapeHtml(page.summary || "暂无摘要。")}</p>
+    ${conceptLead(page)}
     <dl class="wiki-infobox">
       <div><dt>Status</dt><dd>${escapeHtml(page.status || "active")}</dd></div>
       <div><dt>Updated</dt><dd>${escapeHtml(page.updated || "unknown")}</dd></div>
-      <div><dt>Path</dt><dd>${escapeHtml(page.path)}</dd></div>
+      <div><dt>Sources</dt><dd>${escapeHtml((page.sources || []).length)}</dd></div>
     </dl>
-    <div class="wiki-body">${renderMarkdownArticle(page.body, page.id)}</div>
+    ${renderConceptSection("定义依据", sections.definition, "暂无定义依据。")}
+    ${renderConceptSection("证据", [...(sections.source_evidence || []), ...(sections.academic_evidence || [])], "暂无证据。")}
+    ${renderConceptSection("关系", sections.relations, "暂无关系。")}
+    ${renderConceptSection("开放问题", sections.open_questions, "暂无开放问题。")}
+    <details class="wiki-raw-details">
+      <summary>原始概念页</summary>
+      <div class="wiki-body">${renderMarkdownArticle(page.body, page.id)}</div>
+    </details>
   `;
 
   $("#wikiConceptList").innerHTML = (page.catalog || [])
@@ -504,6 +537,7 @@ async function deleteCurrentConcept() {
       }),
     });
     setOutput(result);
+    const archives = archiveRecordsFromResult(result);
     state.currentConcept = "";
     state.currentConceptPage = null;
     renderConceptActionState(null);
@@ -511,6 +545,7 @@ async function deleteCurrentConcept() {
     $("#wikiConceptList").innerHTML = "";
     $("#wikiEdgeList").innerHTML = "";
     await refresh();
+    renderArchivePanel(archives);
   } catch (error) {
     setOutput(`Error: ${error.message}`);
   } finally {
@@ -798,6 +833,128 @@ function sourceKindOptions(current) {
     .join("");
 }
 
+function conceptReviewStatusLabel(status) {
+  return {
+    pending: "待审核",
+    accepted: "已接受",
+    rejected: "已拒绝",
+    renamed: "已改名",
+  }[status] || status || "待审核";
+}
+
+function normalizedConceptReviews(ingest) {
+  const reviewed = ingest.concept_reviews?.candidates || [];
+  if (reviewed.length) return reviewed;
+  return (ingest.concept_candidates || []).map((concept, index) => ({
+    ...concept,
+    candidate_id: concept.candidate_id || concept.id || `concept-${String(index + 1).padStart(3, "0")}`,
+    display_name: concept.display_name || concept.name || "",
+    status: concept.status || "pending",
+    note: concept.note || "",
+    reviewed_at: concept.reviewed_at || null,
+  }));
+}
+
+function renderConceptCandidateList(sourceId, candidates) {
+  if (!candidates.length) {
+    return `<p class="empty">暂无候选概念。</p>`;
+  }
+  return `
+    <div class="concept-review-list">
+      ${candidates.slice(0, 15).map((concept) => {
+        const status = concept.status || "pending";
+        const canReview = status === "pending";
+        return `
+          <article class="concept-review-card">
+            <div class="concept-review-head">
+              <div>
+                <strong>${escapeHtml(concept.name || concept.candidate_id)}</strong>
+                <span>${escapeHtml(concept.type || "concept")} · confidence ${escapeHtml(String(concept.confidence ?? ""))}</span>
+              </div>
+              <span class="concept-review-status is-${escapeHtml(status)}">${escapeHtml(conceptReviewStatusLabel(status))}</span>
+            </div>
+            <div class="concept-review-display">展示名：${escapeHtml(concept.display_name || concept.name || "")}</div>
+            ${concept.definition_draft ? `<p>${escapeHtml(concept.definition_draft)}</p>` : ""}
+            ${concept.evidence_quote ? `<blockquote>${escapeHtml(concept.evidence_quote)}</blockquote>` : ""}
+            ${concept.note ? `<small>备注：${escapeHtml(concept.note)}</small>` : ""}
+            <div class="concept-review-actions">
+              ${canReview ? `
+                <button class="inline-action" type="button" data-candidate-review-action="accept" data-candidate-review-source="${escapeHtml(sourceId)}" data-candidate-review-id="${escapeHtml(concept.candidate_id)}">接受</button>
+                <button class="inline-action danger-inline" type="button" data-candidate-review-action="reject" data-candidate-review-source="${escapeHtml(sourceId)}" data-candidate-review-id="${escapeHtml(concept.candidate_id)}">拒绝</button>
+                <button class="inline-action" type="button" data-candidate-review-action="rename" data-candidate-review-source="${escapeHtml(sourceId)}" data-candidate-review-id="${escapeHtml(concept.candidate_id)}" data-candidate-review-name="${escapeHtml(concept.display_name || concept.name || "")}">改名</button>
+              ` : `<span>${escapeHtml(conceptReviewStatusLabel(status))}${status === "renamed" ? `：${escapeHtml(concept.display_name || "")}` : ""}</span>`}
+            </div>
+          </article>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
+function renderIngestPanel(item) {
+  const ingest = item.ingest || {};
+  const status = ingest.status || {};
+  const summary = ingest.summary || {};
+  const concepts = normalizedConceptReviews(ingest);
+  const artifacts = status.artifacts || {};
+  const artifactUpdatedAt = ingest.artifact_updated_at || status.artifact_updated_at || {};
+  const sourceId = item.source_id || ingest.source_id || "";
+  const wikiSourcePath = status.wiki_source_path || "";
+  const artifactLabels = [
+    ["raw_text", "raw_text"],
+    ["clean_text", "clean_text"],
+    ["source_summary", "summary JSON"],
+    ["concept_candidates", "concepts JSON"],
+    ["error", "error JSON"],
+  ];
+  return `
+    <section class="ingest-status-panel field-wide">
+      <div class="ingest-status-head">
+        <div>
+          <div class="ingest-kicker">MVP 自动整理</div>
+          <div class="ingest-state-row">
+            <span class="pill">${escapeHtml(status.status || "not_started")}</span>
+            <span>${escapeHtml(status.current_step || "未运行")}</span>
+            ${sourceId ? `<code>${escapeHtml(sourceId)}</code>` : ""}
+          </div>
+        </div>
+        <div class="ingest-head-actions">
+          ${wikiSourcePath ? `<button class="inline-action" type="button" data-source-card-path="${escapeHtml(wikiSourcePath)}">查看 Source Card</button>` : ""}
+          <button class="inline-action" type="button" data-source-reingest="${escapeHtml(sourceId)}" ${sourceId ? "" : "disabled"}>重新整理</button>
+        </div>
+      </div>
+      ${status.status === "review_required" ? `<div class="ingest-review-note">该资料需要人工检查，未写入 source card。</div>` : ""}
+      ${status.error ? `<div class="ingest-error">${escapeHtml(status.error)}</div>` : ""}
+      ${summary.one_sentence_summary ? `
+        <div class="ingest-summary">
+          <strong>一句话摘要</strong>
+          <p>${escapeHtml(summary.one_sentence_summary)}</p>
+        </div>
+      ` : `<div class="empty">暂无摘要。勾选自动 ingest 或点击重新整理后生成。</div>`}
+      ${(summary.key_points || []).length ? `
+        <div class="ingest-mini-section">
+          <strong>核心要点</strong>
+          <ol>${summary.key_points.slice(0, 5).map((point) => `<li>${escapeHtml(point)}</li>`).join("")}</ol>
+        </div>
+      ` : ""}
+      <div class="ingest-mini-section">
+        <strong>候选概念</strong>
+        <div data-concept-review-source="${escapeHtml(sourceId)}">
+          ${renderConceptCandidateList(sourceId, concepts)}
+        </div>
+      </div>
+      <div class="artifact-row">
+        ${Object.entries(artifacts).map(([key, exists]) => `<span class="${exists ? "artifact-ok" : "artifact-missing"}">${escapeHtml(key)}: ${exists ? "yes" : "no"}</span>`).join("")}
+      </div>
+      <div class="artifact-actions">
+        ${artifactLabels.map(([type, label]) => `
+          <button class="inline-action" type="button" data-artifact-source="${escapeHtml(sourceId)}" data-artifact-type="${escapeHtml(type)}" ${sourceId ? "" : "disabled"}>${escapeHtml(label)}${artifactUpdatedAt[type] ? `<small>${escapeHtml(artifactUpdatedAt[type])}</small>` : ""}</button>
+        `).join("")}
+      </div>
+    </section>
+  `;
+}
+
 function renderDomainSources(data) {
   const root = $("#domainSourceList");
   const sources = data.sources || [];
@@ -875,6 +1032,7 @@ function renderDomainSources(data) {
               <button class="secondary" type="button" data-source-save="${escapeHtml(item.path)}">保存修改</button>
               <button class="danger-button" type="button" data-source-delete="${escapeHtml(item.path)}">删除资料</button>
             </div>
+            ${renderIngestPanel(item)}
           </div>
         </details>
       `,
@@ -1050,13 +1208,23 @@ function renderConceptQueue(items) {
   }
   root.innerHTML = items
     .map(
-      (item) => `
+      (item) => {
+        const evidenceSources = (item.evidence_sources || []).slice(0, 2).join("、");
+        const preview = (item.evidence_preview || [])[0] || item.summary || item.path;
+        return `
         <button class="task-item is-clickable" type="button" data-concept-slug="${escapeHtml(item.slug)}">
-          <div class="task-title">${escapeHtml(item.title)}</div>
+          <div class="task-title-row">
+            <span class="task-title">${escapeHtml(item.title)}</span>
+            <span class="task-badge">${escapeHtml(actionLabel(item.action))}</span>
+          </div>
           <div class="task-reason">${escapeHtml(item.reason)}</div>
-          <div class="task-meta">${escapeHtml(truncateText(item.summary || item.path, 120))}</div>
+          <div class="task-meta">为什么引入：${escapeHtml(item.introduced_by || "自动抽取生成。")}</div>
+          <div class="task-meta">推荐操作：${escapeHtml(actionLabel(item.recommended_action || item.action))}${item.target_title ? ` → ${escapeHtml(item.target_title)}` : ""}</div>
+          <div class="task-meta">证据来源：${escapeHtml(evidenceSources || "暂无明确来源")} · ${escapeHtml(item.evidence_count || 0)} 证据 · ${escapeHtml(item.relation_count || 0)} 关系</div>
+          <div class="task-meta">${escapeHtml(truncateText(preview, 140))}</div>
         </button>
-      `,
+      `;
+      },
     )
     .join("");
 }
@@ -1117,6 +1285,7 @@ function actionLabel(action) {
     merge_suggested: "建议合并",
     promote: "保留转正",
     manual_review: "人工判断",
+    already_curated: "已整理",
   }[action] || action;
 }
 
@@ -1127,6 +1296,8 @@ function organizeItemActions(item) {
   ];
   if (item.action === "delete_noise") {
     buttons.push(`<button class="danger-inline" type="button" data-concept-decision="delete" data-decision-slug="${slug}">确认删除</button>`);
+  } else if (item.action === "merge_suggested" && item.target_slug) {
+    buttons.push(`<button class="inline-action" type="button" data-concept-merge="${slug}" data-merge-target="${escapeHtml(item.target_slug)}">确认合并</button>`);
   } else if (item.action === "promote") {
     buttons.push(`<button class="inline-action" type="button" data-concept-decision="promote" data-decision-slug="${slug}">确认保留</button>`);
   } else {
@@ -1137,6 +1308,43 @@ function organizeItemActions(item) {
     buttons.push(`<button class="inline-action" type="button" data-concept-slug="${escapeHtml(item.target_slug)}">打开目标</button>`);
   }
   return `<div class="organize-actions">${buttons.join("")}</div>`;
+}
+
+function archiveRecordsFromResult(data) {
+  const records = [];
+  if (data?.archive) records.push(data.archive);
+  if (data?.merge?.archive) records.push(data.merge.archive);
+  (data?.applied || []).forEach((item) => {
+    if (item.archive) records.push(item.archive);
+  });
+  return records;
+}
+
+function renderArchivePanel(archives = []) {
+  const root = $("#organizeConceptsResult");
+  const records = archives.filter(Boolean);
+  if (!records.length) return;
+  root.classList.remove("hidden");
+  const panel = `
+    <div class="archive-panel">
+      <div class="organize-head">
+        <div>
+          <strong>最近归档</strong>
+          <span>概念页已移入 archive，可恢复；raw sources 未改动。</span>
+        </div>
+      </div>
+      <div class="archive-list">
+        ${records.map((record) => `
+          <div class="archive-item">
+            <span>${escapeHtml(record.label || record.original_path)}</span>
+            <small>${escapeHtml(record.action || "archive")} · ${escapeHtml(record.archived_path || "")}</small>
+            <button class="inline-action" type="button" data-archive-restore="${escapeHtml(record.id)}">恢复</button>
+          </div>
+        `).join("")}
+      </div>
+    </div>
+  `;
+  root.innerHTML = panel + root.innerHTML;
 }
 
 function renderOrganizeResult(data) {
@@ -1177,7 +1385,11 @@ function renderOrganizeResult(data) {
               <div class="organize-item">
                 <span>${escapeHtml(item.title)}</span>
                 <small>${escapeHtml(item.reason)}</small>
+                <small>引入：${escapeHtml(item.introduced_by || "自动抽取")}</small>
+                <small>${escapeHtml(item.evidence_count || 0)} 证据 · ${escapeHtml(item.relation_count || 0)} 关系 · ${escapeHtml(item.confidence || "low")} confidence</small>
                 ${item.target_title ? `<small>目标：${escapeHtml(item.target_title)}</small>` : ""}
+                ${(item.evidence_sources || []).length ? `<small>来源：${escapeHtml(item.evidence_sources.slice(0, 2).join("、"))}</small>` : ""}
+                ${(item.affected_files || []).length ? `<small>影响文件：${escapeHtml(item.affected_files.slice(0, 3).join(" · "))}</small>` : ""}
                 ${organizeItemActions(item)}
               </div>
             `).join("")}
@@ -1186,6 +1398,7 @@ function renderOrganizeResult(data) {
         .join("")}
     </div>
   `;
+  renderArchivePanel(archiveRecordsFromResult(data));
 }
 
 async function organizeConcepts(apply = false) {
@@ -1217,6 +1430,62 @@ async function organizeConcepts(apply = false) {
   }
 }
 
+async function mergeConcept(sourceSlug, targetSlug) {
+  const ok = window.confirm("确认合并这两个概念？源概念页会进入 archive，证据和关系会并入目标页，并记录 alias。");
+  if (!ok) return;
+  const domain = state.selectedDomain || state.graphDomain || $("#graphDomainSelect").value;
+  setBusy(true);
+  try {
+    const result = await api("/api/concepts/merge", {
+      method: "POST",
+      body: JSON.stringify({
+        source_slug: sourceSlug,
+        target_slug: targetSlug,
+        domain,
+        rebuild_domain: true,
+        rebuild_index: true,
+        run_lint: $("#runLint").checked,
+      }),
+    });
+    setOutput(result);
+    const archives = archiveRecordsFromResult(result);
+    await Promise.all([loadWorkbench(domain), loadConceptGraph(domain)]);
+    await loadConceptPage(targetSlug, domain, { focusDetail: true });
+    await organizeConcepts(false);
+    renderArchivePanel(archives);
+  } catch (error) {
+    setOutput(`Error: ${error.message}`);
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function restoreConceptArchive(archiveId) {
+  const ok = window.confirm("恢复这个归档概念页？如果原路径已被占用，会用新的唯一文件名恢复。");
+  if (!ok) return;
+  const domain = state.selectedDomain || state.graphDomain || $("#graphDomainSelect").value;
+  setBusy(true);
+  try {
+    const result = await api("/api/concepts/restore", {
+      method: "POST",
+      body: JSON.stringify({
+        archive_id: archiveId,
+        domain,
+        rebuild_domain: true,
+        rebuild_index: true,
+        run_lint: $("#runLint").checked,
+      }),
+    });
+    setOutput(result);
+    await Promise.all([loadWorkbench(domain), loadConceptGraph(domain)]);
+    await organizeConcepts(false);
+  } catch (error) {
+    setOutput(`Error: ${error.message}`);
+  } finally {
+    setBusy(false);
+  }
+}
+
 async function applyConceptDecision(slug, decision) {
   const label = decision === "delete" ? "删除这个概念？" : "保留为正式概念？";
   const ok = window.confirm(label);
@@ -1236,6 +1505,7 @@ async function applyConceptDecision(slug, decision) {
       }),
     });
     setOutput(result);
+    const archives = archiveRecordsFromResult(result);
     if (decision === "delete" && state.currentConcept === slug) {
       state.currentConcept = "";
       state.currentConceptPage = null;
@@ -1249,6 +1519,7 @@ async function applyConceptDecision(slug, decision) {
       await loadConceptPage(slug, domain);
     }
     await organizeConcepts(false);
+    renderArchivePanel(archives);
   } catch (error) {
     setOutput(`Error: ${error.message}`);
   } finally {
@@ -1647,6 +1918,101 @@ async function ingestExisting(path) {
   }
 }
 
+async function reingestSource(sourceId) {
+  if (!sourceId) {
+    setOutput("缺少 source_id，无法重新整理。");
+    return;
+  }
+  setBusy(true);
+  try {
+    const result = await api(`/api/sources/${encodeURIComponent(sourceId)}/reingest`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+    setOutput(result);
+    await refresh();
+  } catch (error) {
+    setOutput(`Error: ${error.message}`);
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function viewIngestArtifact(sourceId, artifactType) {
+  if (!sourceId || !artifactType) {
+    setOutput("缺少 artifact 参数。");
+    return;
+  }
+  try {
+    const result = await api(`/api/sources/${encodeURIComponent(sourceId)}/artifacts/${encodeURIComponent(artifactType)}`);
+    setOutput(result.content ?? result);
+  } catch (error) {
+    setOutput(`Error: ${error.message}`);
+  }
+}
+
+function viewSourceCard(path) {
+  if (!path) {
+    setOutput("这条资料尚未生成 source card。");
+    return;
+  }
+  setOutput({
+    source_card: path,
+    note: "Source card 已生成在 wiki/sources 下，可在本地文件系统或后续阅读器中查看。",
+  });
+}
+
+function conceptReviewContainer(sourceId) {
+  return $$("[data-concept-review-source]").find((item) => item.dataset.conceptReviewSource === sourceId);
+}
+
+function showConceptReviewError(sourceId, message) {
+  const container = conceptReviewContainer(sourceId);
+  if (!container) return;
+  container.innerHTML = `<div class="concept-review-error">${escapeHtml(message)}</div>${container.innerHTML}`;
+}
+
+async function refreshConceptCandidates(sourceId) {
+  const container = conceptReviewContainer(sourceId);
+  const result = await api(`/api/sources/${encodeURIComponent(sourceId)}/concept-candidates`);
+  if (container) {
+    container.innerHTML = renderConceptCandidateList(sourceId, result.candidates || []);
+  }
+  return result;
+}
+
+async function reviewConceptCandidate(sourceId, candidateId, action, currentName = "") {
+  if (!sourceId || !candidateId || !action) {
+    setOutput("缺少候选概念审核参数。");
+    return;
+  }
+  const payload = {};
+  if (action === "rename") {
+    const displayName = window.prompt("新的展示名", currentName || "");
+    if (displayName === null) return;
+    payload.display_name = displayName.trim();
+    if (!payload.display_name) {
+      setOutput("展示名不能为空。");
+      return;
+    }
+  }
+  setBusy(true);
+  try {
+    await api(`/api/sources/${encodeURIComponent(sourceId)}/concept-candidates/${encodeURIComponent(candidateId)}/${encodeURIComponent(action)}`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    const result = await refreshConceptCandidates(sourceId);
+    setOutput(result);
+  } catch (error) {
+    const message = `候选概念审核失败：${error.message}`;
+    setOutput(message);
+    showConceptReviewError(sourceId, message);
+  } finally {
+    setBusy(false);
+  }
+}
+
 function autoSupplementPayload(path) {
   return {
     path,
@@ -1822,11 +2188,40 @@ function bindEvents() {
     }
   });
   $("#domainSourceList").addEventListener("click", (event) => {
+    const sourceCardButton = event.target.closest("[data-source-card-path]");
+    const candidateReviewButton = event.target.closest("[data-candidate-review-action]");
+    const reingestButton = event.target.closest("[data-source-reingest]");
+    const artifactButton = event.target.closest("[data-artifact-source]");
     const autoSupplementButton = event.target.closest("[data-source-autosupplement]");
     const ingestButton = event.target.closest("[data-source-ingest]");
     const moveButton = event.target.closest("[data-source-move]");
     const saveButton = event.target.closest("[data-source-save]");
     const deleteButton = event.target.closest("[data-source-delete]");
+    if (sourceCardButton) {
+      event.stopPropagation();
+      viewSourceCard(sourceCardButton.dataset.sourceCardPath);
+      return;
+    }
+    if (candidateReviewButton) {
+      event.stopPropagation();
+      reviewConceptCandidate(
+        candidateReviewButton.dataset.candidateReviewSource,
+        candidateReviewButton.dataset.candidateReviewId,
+        candidateReviewButton.dataset.candidateReviewAction,
+        candidateReviewButton.dataset.candidateReviewName || "",
+      );
+      return;
+    }
+    if (reingestButton) {
+      event.stopPropagation();
+      reingestSource(reingestButton.dataset.sourceReingest);
+      return;
+    }
+    if (artifactButton) {
+      event.stopPropagation();
+      viewIngestArtifact(artifactButton.dataset.artifactSource, artifactButton.dataset.artifactType);
+      return;
+    }
     if (autoSupplementButton) {
       event.stopPropagation();
       autoSupplementSource(autoSupplementButton.dataset.sourceAutosupplement);
@@ -1898,6 +2293,16 @@ function bindEvents() {
     const decisionButton = event.target.closest("[data-concept-decision]");
     if (decisionButton) {
       applyConceptDecision(decisionButton.dataset.decisionSlug, decisionButton.dataset.conceptDecision);
+      return;
+    }
+    const mergeButton = event.target.closest("[data-concept-merge]");
+    if (mergeButton) {
+      mergeConcept(mergeButton.dataset.conceptMerge, mergeButton.dataset.mergeTarget);
+      return;
+    }
+    const restoreButton = event.target.closest("[data-archive-restore]");
+    if (restoreButton) {
+      restoreConceptArchive(restoreButton.dataset.archiveRestore);
       return;
     }
     const conceptLink = event.target.closest("[data-concept-slug]");
