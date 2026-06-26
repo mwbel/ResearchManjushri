@@ -3,7 +3,7 @@ title: 现代天文学 Knowledge Network
 type: domain
 status: active
 created: 2026-06-17
-updated: 2026-06-19
+updated: 2026-06-24
 summary: 现代天文学 单学科知识网络入口，串联网页文章、本地资料、source summary、concept、analysis 与待办问题。
 tags: [modern-astronomy, domain-network]
 sources: []
@@ -18,7 +18,7 @@ sources: []
 - Registered raw sources: 0
 - Connected wiki pages: 1
 - Inbox sources waiting for ingest: 0
-- Generated on: 2026-06-19
+- Generated on: 2026-06-24
 
 ## How To Add Knowledge
 
@@ -58,7 +58,7 @@ flowchart LR
 
 | Type | Title | Summary | Wiki Page |
 | --- | --- | --- | --- |
-| concept | [Modern Astronomy](../concepts/modern-astronomy.md) | 现代天文学总览页，用来组织观测、天体物理、宇宙学、数据分析与历史对照主题。 | `wiki/concepts/modern-astronomy.md` |
+| concept | [Modern Astronomy](../.archive/concepts/20260624-202106-6939af40-modern-astronomy.md) | 现代天文学总览页，用来组织观测、天体物理、宇宙学、数据分析与历史对照主题。 | `wiki/.archive/concepts/20260624-202106-6939af40-modern-astronomy.md` |
 
 ## Next Network Actions
 

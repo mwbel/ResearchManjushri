@@ -1,0 +1,16 @@
+{
+  "id": "20260624-125412-50e30f56",
+  "created_at": "2026-06-24T12:54:12",
+  "action": "delete",
+  "reason": "manual decision: delete",
+  "label": "智能",
+  "original_path": "wiki/concepts/智能.md",
+  "archived_path": "wiki/.archive/concepts/20260624-125412-50e30f56-智能.md",
+  "domains": [
+    "ai"
+  ],
+  "sources": [
+    "wiki/sources/2026-06-17-人工智能的数学革命已经到来.md"
+  ],
+  "extra": {}
+}

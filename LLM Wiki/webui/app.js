@@ -55,6 +55,13 @@ function fileToBase64(file) {
   });
 }
 
+function isHiddenSystemDomain(item) {
+  const slug = String(item?.slug || "");
+  const sourceCount = Number(item?.source_count || 0);
+  const pageCount = Number(item?.wiki_page_count || 0);
+  return slug.startsWith("mvp-batch-") && sourceCount === 0 && pageCount === 0;
+}
+
 function setBusy(isBusy) {
   $("#sourceForm").classList.toggle("is-busy", isBusy);
 }
@@ -179,11 +186,11 @@ function renderDomainSelect(domains) {
   const current = select.value || "tibetan-astronomy-calendar";
   select.innerHTML = domains
     .map((item) => `<option value="${escapeHtml(item.slug)}">${escapeHtml(item.label)}</option>`)
-    .join("") + `<option value="__new__">＋ 新增学科</option>`;
+    .join("");
   if (current === "__new__") {
-    select.value = "__new__";
+    select.value = domains[0]?.slug || "ai";
   } else {
-    select.value = domains.some((item) => item.slug === current) ? current : domains[0]?.slug || "general";
+    select.value = domains.some((item) => item.slug === current) ? current : domains[0]?.slug || "ai";
   }
   toggleNewDomainFields();
 }
@@ -368,6 +375,20 @@ function uniqueValues(values) {
   });
 }
 
+function rawSourcePathsForGraphItem(item, relatedEdges = []) {
+  const paths = [
+    item?.source_path,
+    ...(item?.source_paths || []),
+    ...relatedEdges.map((edge) => edge.source_path),
+  ];
+  return uniqueValues(paths).filter((path) => String(path).startsWith("raw/sources/"));
+}
+
+function domainFromRawSourcePath(path) {
+  const parts = String(path || "").split("/");
+  return parts[0] === "raw" && parts[1] === "sources" ? parts[2] : "";
+}
+
 function renderPills(items) {
   const values = uniqueValues(items || []);
   if (!values.length) return "";
@@ -441,6 +462,111 @@ function renderConceptActionState(page) {
   const showKeep = page && conceptNeedsDecision(page);
   keepButton.classList.toggle("hidden", !showKeep);
   keepButton.disabled = !showKeep;
+  $("#editConceptButton").disabled = !page?.slug;
+}
+
+function setConceptEditorVisible(isVisible) {
+  $("#conceptEditor").classList.toggle("hidden", !isVisible);
+}
+
+function openConceptEditor(page = null) {
+  const domain = state.graphDomain || $("#graphDomainSelect").value || state.selectedDomain || "general";
+  $("#conceptEditSlug").value = page?.slug || "";
+  $("#conceptEditTitle").value = page?.title || "";
+  $("#conceptEditAliases").value = (page?.aliases || []).join(", ");
+  $("#conceptEditSummary").value = page?.summary || page?.lead_definition || "";
+  $("#conceptEditBody").value = page?.body || [
+    `# ${page?.title || "新概念"}`,
+    "",
+    "## Working Definition",
+    "",
+    "- 待补：填写这个概念的工作定义。",
+    "",
+    "## Source-Derived Evidence",
+    "",
+    "- 待补：补充来源证据。",
+    "",
+    "## Source-Derived Relations",
+    "",
+    "- 待补：补充与其他概念的关系。",
+  ].join("\n");
+  $("#conceptEditor").dataset.domain = domain;
+  setConceptEditorVisible(true);
+  $("#conceptEditTitle").focus();
+}
+
+async function saveConceptEditor(event) {
+  event.preventDefault();
+  const slug = $("#conceptEditSlug").value.trim();
+  const domain = $("#conceptEditor").dataset.domain || state.graphDomain || "general";
+  const payload = {
+    slug,
+    title: $("#conceptEditTitle").value.trim(),
+    aliases: $("#conceptEditAliases").value.trim(),
+    summary: $("#conceptEditSummary").value.trim(),
+    body: $("#conceptEditBody").value,
+    domain,
+    rebuild_domain: true,
+    rebuild_index: true,
+    run_lint: $("#runLint").checked,
+  };
+  if (!payload.title) {
+    setOutput("概念标题不能为空。");
+    return;
+  }
+  setBusy(true);
+  try {
+    const endpoint = slug ? "/api/concepts/update" : "/api/concepts/create";
+    const result = await api(endpoint, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    setOutput(result);
+    setConceptEditorVisible(false);
+    await Promise.all([loadWorkbench(domain), loadConceptGraph(domain)]);
+    await loadConceptPage(result.slug, domain, { focusDetail: true });
+  } catch (error) {
+    setOutput(`Error: ${error.message}`);
+  } finally {
+    setBusy(false);
+  }
+}
+
+function createConceptFromGraphLabel(label) {
+  openConceptEditor({
+    title: label,
+    summary: `${label} 的概念页。`,
+    aliases: [],
+    body: "",
+  });
+}
+
+async function removeGraphNode(sourceId, candidateId, label = "") {
+  if (!label && (!sourceId || !candidateId)) {
+    setOutput("这个节点缺少可删除的图谱来源。");
+    return;
+  }
+  const ok = window.confirm(`从图谱中移除节点“${label || candidateId}”？有候选来源时会改为已拒绝；否则会清理指向该节点的关系线。`);
+  if (!ok) return;
+  const domain = state.graphDomain || $("#graphDomainSelect").value || "general";
+  setBusy(true);
+  try {
+    const result = await api("/api/concepts/graph-node/delete", {
+      method: "POST",
+      body: JSON.stringify({
+        source_id: sourceId,
+        candidate_id: candidateId,
+        label,
+        domain,
+      }),
+    });
+    setOutput(result);
+    await Promise.all([loadWorkbench(domain), loadConceptGraph(domain)]);
+  } catch (error) {
+    setOutput(`Error: ${error.message}`);
+  } finally {
+    setBusy(false);
+  }
 }
 
 function renderWikiPage(page) {
@@ -518,18 +644,22 @@ async function loadConceptPage(slug, domain = state.graphDomain, options = {}) {
 
 async function deleteCurrentConcept() {
   if (!state.currentConcept) {
-    setOutput("请先选择一个概念。");
+    setOutput("请先选择一个概念页。");
     return;
   }
-  const title = $("#wikiArticle h1")?.textContent || state.currentConcept;
-  const ok = window.confirm(`删除概念“${title}”？这会删除概念页，并清理指向它的自动关系。`);
+  await deleteConceptPageBySlug(state.currentConcept, $("#wikiArticle h1")?.textContent || state.currentConcept);
+}
+
+async function deleteConceptPageBySlug(slug, title = "") {
+  if (!slug) return;
+  const ok = window.confirm(`删除概念页“${title || slug}”？这会归档该概念页，并清理指向它的自动关系。`);
   if (!ok) return;
   setBusy(true);
   try {
     const result = await api("/api/concepts/delete", {
       method: "POST",
       body: JSON.stringify({
-        slug: state.currentConcept,
+        slug,
         domain: state.graphDomain,
         rebuild_domain: true,
         rebuild_index: true,
@@ -538,12 +668,14 @@ async function deleteCurrentConcept() {
     });
     setOutput(result);
     const archives = archiveRecordsFromResult(result);
-    state.currentConcept = "";
-    state.currentConceptPage = null;
-    renderConceptActionState(null);
-    $("#wikiArticle").innerHTML = "";
-    $("#wikiConceptList").innerHTML = "";
-    $("#wikiEdgeList").innerHTML = "";
+    if (state.currentConcept === slug || state.currentConceptPage?.slug === slug) {
+      state.currentConcept = "";
+      state.currentConceptPage = null;
+      renderConceptActionState(null);
+      $("#wikiArticle").innerHTML = "";
+      $("#wikiConceptList").innerHTML = "";
+      $("#wikiEdgeList").innerHTML = "";
+    }
     await refresh();
     renderArchivePanel(archives);
   } catch (error) {
@@ -577,6 +709,7 @@ function renderD3ConceptGraph(data, visibleNodes, visibleEdges) {
   const links = visibleEdges
     .filter((edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target))
     .map((edge) => ({ ...edge }));
+  const visibleLinkLabels = links.filter((edge) => !["相关", "映射到"].includes(edge.relation));
   const degree = new Map(nodes.map((node) => [node.id, 0]));
   links.forEach((link) => {
     degree.set(link.source, (degree.get(link.source) || 0) + 1);
@@ -627,7 +760,7 @@ function renderD3ConceptGraph(data, visibleNodes, visibleEdges) {
   const linkLabel = graph.append("g")
     .attr("class", "graph-link-labels")
     .selectAll("text")
-    .data(links)
+    .data(visibleLinkLabels)
     .join("text")
     .attr("class", "graph-link-label")
     .text((edge) => truncateText(edge.relation, 8));
@@ -658,12 +791,26 @@ function renderD3ConceptGraph(data, visibleNodes, visibleEdges) {
     .on("click", (event, item) => {
       event.stopPropagation();
       const related = links.filter((edge) => edge.source === item.id || edge.target === item.id);
+      const sourcePaths = rawSourcePathsForGraphItem(item, related);
+      const sourceAction = sourcePaths.length
+        ? `<button class="inline-action graph-detail-action" type="button" data-graph-show-source="${escapeHtml(sourcePaths[0])}">在原始资料中显示</button>`
+        : "";
       renderGraphDetail(`
         <strong>${escapeHtml(item.label)}</strong>
         <span>${escapeHtml(item.path || "concept")}</span>
-        <p>${related.length} 条关系。${related[0] ? escapeHtml(related[0].evidence || related[0].concept_page || "") : ""}</p>
+        <p>${related.length} 条关系。${sourcePaths.length ? `关联 ${sourcePaths.length} 条原始资料。` : ""}${related[0] ? escapeHtml(related[0].evidence || related[0].concept_page || "") : ""}</p>
+        ${sourceAction}
+        ${item.path ? `
+          <button class="inline-action graph-detail-action" type="button" data-graph-edit-concept="${escapeHtml(item.path.split("/").pop().replace(/\.md$/, ""))}">编辑概念页</button>
+          <button class="danger-inline graph-detail-action" type="button" data-graph-delete-concept="${escapeHtml(item.path.split("/").pop().replace(/\.md$/, ""))}" data-graph-delete-title="${escapeHtml(item.label)}">删除概念页</button>
+        ` : `
+          <button class="inline-action graph-detail-action" type="button" data-graph-create-concept="${escapeHtml(item.label)}">创建为概念页</button>
+          <button class="danger-inline graph-detail-action" type="button" data-graph-remove-node="${escapeHtml(item.label)}" data-graph-remove-source="${escapeHtml(item.source_id || "")}" data-graph-remove-candidate="${escapeHtml(item.candidate_id || "")}">移除图谱节点</button>
+        `}
       `);
-      loadConceptPage(item.path ? item.path.split("/").pop().replace(/\.md$/, "") : item.id, state.graphDomain, { focusDetail: true });
+      if (item.path) {
+        loadConceptPage(item.path.split("/").pop().replace(/\.md$/, ""), state.graphDomain, { focusDetail: true });
+      }
     });
 
   node.append("circle")
@@ -718,7 +865,7 @@ function renderStaticConceptGraph(data, visibleNodes, visibleEdges) {
       return `
         <g class="graph-edge">
           <line x1="${source.x}" y1="${source.y}" x2="${target.x}" y2="${target.y}" marker-end="url(#arrow)" />
-          <text x="${midX}" y="${midY - 5}">${escapeHtml(truncateText(edge.relation, 10))}</text>
+          ${["相关", "映射到"].includes(edge.relation) ? "" : `<text x="${midX}" y="${midY - 5}">${escapeHtml(truncateText(edge.relation, 10))}</text>`}
         </g>
       `;
     })
@@ -751,7 +898,7 @@ function renderStaticConceptGraph(data, visibleNodes, visibleEdges) {
 }
 
 function renderConceptGraph(data) {
-  $("#graphSummary").textContent = `${data.domain_label} · ${data.concept_count} concepts · ${data.relation_count} relations · 可缩放/拖拽`;
+  $("#graphSummary").textContent = `${data.domain_label} · ${data.concept_count} 个概念 · ${data.relation_count} 条关系 · 可缩放/拖拽`;
   state.conceptCatalog = data.nodes.map((node) => ({
     id: node.id,
     slug: node.path ? node.path.split("/").pop().replace(/\.md$/, "") : node.id,
@@ -855,6 +1002,10 @@ function normalizedConceptReviews(ingest) {
   }));
 }
 
+function normalizedRelationReviews(ingest) {
+  return ingest.relation_reviews?.relations || [];
+}
+
 function renderConceptCandidateList(sourceId, candidates) {
   if (!candidates.length) {
     return `<p class="empty">暂无候选概念。</p>`;
@@ -891,11 +1042,48 @@ function renderConceptCandidateList(sourceId, candidates) {
   `;
 }
 
+function renderRelationCandidateList(sourceId, relations) {
+  if (!relations.length) {
+    return `<p class="empty">暂无候选关系。接受相关概念后，可审核关系并投影到图谱。</p>`;
+  }
+  return `
+    <div class="concept-review-list">
+      ${relations.slice(0, 20).map((relation) => {
+        const status = relation.status || "pending";
+        const canAccept = status !== "accepted";
+        const canReject = status !== "rejected";
+        return `
+          <article class="concept-review-card relation-review-card">
+            <div class="concept-review-head">
+              <div>
+                <strong>${escapeHtml(relation.source_name || "")} → ${escapeHtml(relation.target_name || "")}</strong>
+                <span>${escapeHtml(relation.relation || "相关")} · confidence ${escapeHtml(String(relation.confidence ?? ""))}</span>
+              </div>
+              <span class="concept-review-status is-${escapeHtml(status)}">${escapeHtml(conceptReviewStatusLabel(status))}</span>
+            </div>
+            ${relation.evidence_quote ? `<blockquote>${escapeHtml(relation.evidence_quote)}</blockquote>` : ""}
+            <div class="concept-review-actions">
+              ${canAccept ? `
+                <button class="inline-action" type="button" data-relation-review-action="accept" data-relation-review-source="${escapeHtml(sourceId)}" data-relation-review-id="${escapeHtml(relation.relation_id)}">接受关系</button>
+              ` : ""}
+              ${canReject ? `
+                <button class="inline-action danger-inline" type="button" data-relation-review-action="reject" data-relation-review-source="${escapeHtml(sourceId)}" data-relation-review-id="${escapeHtml(relation.relation_id)}">${status === "accepted" ? "改为拒绝" : "拒绝"}</button>
+              ` : ""}
+              ${!canAccept && !canReject ? `<span>${escapeHtml(conceptReviewStatusLabel(status))}</span>` : ""}
+            </div>
+          </article>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
 function renderIngestPanel(item) {
   const ingest = item.ingest || {};
   const status = ingest.status || {};
   const summary = ingest.summary || {};
   const concepts = normalizedConceptReviews(ingest);
+  const relations = normalizedRelationReviews(ingest);
   const artifacts = status.artifacts || {};
   const artifactUpdatedAt = ingest.artifact_updated_at || status.artifact_updated_at || {};
   const sourceId = item.source_id || ingest.source_id || "";
@@ -905,6 +1093,8 @@ function renderIngestPanel(item) {
     ["clean_text", "clean_text"],
     ["source_summary", "summary JSON"],
     ["concept_candidates", "concepts JSON"],
+    ["relation_candidates", "relations JSON"],
+    ["accepted_graph", "accepted graph"],
     ["error", "error JSON"],
   ];
   return `
@@ -941,6 +1131,12 @@ function renderIngestPanel(item) {
         <strong>候选概念</strong>
         <div data-concept-review-source="${escapeHtml(sourceId)}">
           ${renderConceptCandidateList(sourceId, concepts)}
+        </div>
+      </div>
+      <div class="ingest-mini-section">
+        <strong>候选关系</strong>
+        <div data-relation-review-source="${escapeHtml(sourceId)}">
+          ${renderRelationCandidateList(sourceId, relations)}
         </div>
       </div>
       <div class="artifact-row">
@@ -1055,12 +1251,28 @@ function focusSourceManager() {
   window.setTimeout(() => panel.classList.remove("is-highlighted"), 1400);
 }
 
+function focusWorkbench() {
+  const panel = document.querySelector(".workbench-panel");
+  if (!panel) return;
+  panel.scrollIntoView({ behavior: "smooth", block: "start" });
+  panel.classList.remove("is-highlighted");
+  window.setTimeout(() => panel.classList.add("is-highlighted"), 0);
+  window.setTimeout(() => panel.classList.remove("is-highlighted"), 1400);
+}
+
 async function openSourceInManager(path) {
   if (!path) return;
   let record = document.querySelector(`[data-source-path="${CSS.escape(path)}"]`);
   if (!record) {
     await loadDomainSources(state.selectedDomain || state.graphDomain);
     record = document.querySelector(`[data-source-path="${CSS.escape(path)}"]`);
+  }
+  if (!record) {
+    const sourceDomain = domainFromRawSourcePath(path);
+    if (sourceDomain && sourceDomain !== state.selectedDomain) {
+      await loadDomainSources(sourceDomain);
+      record = document.querySelector(`[data-source-path="${CSS.escape(path)}"]`);
+    }
   }
   if (!record) {
     setOutput(`没有在当前学科资料列表中找到：${path}`);
@@ -1097,6 +1309,18 @@ function fillSourceRecordFromProposal(record, proposal) {
   if (summary && !record.querySelector(".source-draft-note")) {
     summary.insertAdjacentHTML("afterend", `<div class="source-record-meta source-draft-note">已生成自动补充草稿，确认后点击“保存修改”生效。</div>`);
   }
+}
+
+function resetSourceFormAfterImport(domain) {
+  $("#sourceForm").reset();
+  $("#date").value = today;
+  if (domain) $("#domain").value = domain;
+  $("#newDomainLabel").value = "";
+  $("#newDomainSlug").value = "";
+  $("#localPath").value = "";
+  $("#localFile").value = "";
+  switchMode(state.mode);
+  setIntakeVisible(false);
 }
 
 async function saveDomainSource(path) {
@@ -1200,6 +1424,109 @@ function renderStatTile(value, label) {
   `;
 }
 
+function nextStepForWorkbench(data) {
+  const stats = data.stats || {};
+  const sourceQueue = Number(stats.source_queue || 0);
+  const conceptQueue = Number(stats.concept_queue || 0);
+  const rawSources = Number(stats.raw_sources || 0);
+  if (sourceQueue > 0) {
+    return {
+      title: "检查待补资料",
+      body: `${sourceQueue} 份资料被系统标记为正文或摘要不足。先查看下方卡片，再决定打开补充、生成草稿或重新提取。`,
+      primary: "查看待补资料",
+      action: "focus-source-queue",
+    };
+  }
+  if (conceptQueue > 0) {
+    return {
+      title: "处理概念合并建议",
+      body: `${conceptQueue} 个概念需要决定：同意合并、拒绝建议或保留为独立概念。`,
+      primary: "查看整理建议",
+      action: "focus-concept-queue",
+      secondary: "预览自动整理",
+      secondaryAction: "preview-organize",
+    };
+  }
+  if (rawSources === 0) {
+    return {
+      title: "先导入第一篇资料",
+      body: "粘贴微信文章链接或上传文档后，系统会自动生成摘要、概念和候选关系。",
+      primary: "新增资料",
+      action: "new-source",
+    };
+  }
+  return {
+    title: "查看概念图谱",
+    body: "当前学科暂无待补资料或待整理概念，可以查看图谱或继续导入新资料。",
+    primary: "查看图谱",
+    action: "focus-graph",
+    secondary: "新增资料",
+    secondaryAction: "new-source",
+  };
+}
+
+function renderNextStepPanel(data) {
+  const root = $("#nextStepPanel");
+  if (!root) return;
+  const step = nextStepForWorkbench(data);
+  root.innerHTML = `
+    <div>
+      <span class="next-step-kicker">建议下一步</span>
+      <strong>${escapeHtml(step.title)}</strong>
+      <p>${escapeHtml(step.body)}</p>
+    </div>
+    <div class="next-step-actions">
+      <button class="primary" type="button" data-next-step="${escapeHtml(step.action)}">${escapeHtml(step.primary)}</button>
+      ${step.secondary ? `<button class="secondary" type="button" data-next-step="${escapeHtml(step.secondaryAction)}">${escapeHtml(step.secondary)}</button>` : ""}
+    </div>
+  `;
+}
+
+function renderWorkflowGuide(data) {
+  const root = $("#workflowGuide");
+  if (!root) return;
+  const stats = data.stats || {};
+  const sourceQueue = Number(stats.source_queue || 0);
+  const conceptQueue = Number(stats.concept_queue || 0);
+  const active = sourceQueue > 0 ? "process" : conceptQueue > 0 ? "review" : "graph";
+  const steps = [
+    {
+      id: "collect",
+      title: "1. 资料库",
+      body: `${stats.raw_sources || 0} 份原始资料，${stats.source_summaries || 0} 张资料卡`,
+    },
+    {
+      id: "process",
+      title: "2. 处理资料",
+      body: `${sourceQueue} 份需要补正文、摘要或重新提取`,
+    },
+    {
+      id: "review",
+      title: "3. 审核概念",
+      body: `${conceptQueue} 个概念需要合并、拒绝或保留`,
+    },
+    {
+      id: "graph",
+      title: "4. 看图谱",
+      body: `${stats.concepts || 0} 个概念，${stats.relations || 0} 条关系`,
+    },
+  ];
+  root.innerHTML = `
+    <div class="workflow-head">
+      <strong>这个页面的逻辑</strong>
+      <span>先把资料变成可用正文，再审核概念，最后进入图谱。</span>
+    </div>
+    <div class="workflow-steps">
+      ${steps.map((step) => `
+        <div class="workflow-step ${step.id === active ? "is-active" : ""}">
+          <strong>${escapeHtml(step.title)}</strong>
+          <span>${escapeHtml(step.body)}</span>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
 function renderConceptQueue(items) {
   const root = $("#conceptQueue");
   if (!items.length) {
@@ -1211,18 +1538,37 @@ function renderConceptQueue(items) {
       (item) => {
         const evidenceSources = (item.evidence_sources || []).slice(0, 2).join("、");
         const preview = (item.evidence_preview || [])[0] || item.summary || item.path;
+        const action = item.recommended_action || item.action;
+        const actionButtons = item.action === "merge_suggested" && item.target_slug
+          ? `
+            <div class="task-actions">
+              <button class="inline-action" type="button" data-concept-merge="${escapeHtml(item.slug)}" data-merge-target="${escapeHtml(item.target_slug)}">同意合并</button>
+              <button class="danger-inline" type="button" data-concept-decision="promote" data-decision-slug="${escapeHtml(item.slug)}">拒绝建议</button>
+              <button class="inline-action" type="button" data-concept-slug="${escapeHtml(item.target_slug)}">查看目标</button>
+            </div>
+          `
+          : `
+            <div class="task-actions">
+              <button class="inline-action" type="button" data-concept-slug="${escapeHtml(item.slug)}">打开</button>
+              ${item.action === "delete_noise"
+                ? `<button class="danger-inline" type="button" data-concept-decision="delete" data-decision-slug="${escapeHtml(item.slug)}">同意删除</button>`
+                : `<button class="inline-action" type="button" data-concept-decision="promote" data-decision-slug="${escapeHtml(item.slug)}">同意保留</button>`
+              }
+            </div>
+          `;
         return `
-        <button class="task-item is-clickable" type="button" data-concept-slug="${escapeHtml(item.slug)}">
+        <article class="task-item">
           <div class="task-title-row">
-            <span class="task-title">${escapeHtml(item.title)}</span>
+            <button class="task-title-link" type="button" data-concept-slug="${escapeHtml(item.slug)}">${escapeHtml(item.title)}</button>
             <span class="task-badge">${escapeHtml(actionLabel(item.action))}</span>
           </div>
           <div class="task-reason">${escapeHtml(item.reason)}</div>
           <div class="task-meta">为什么引入：${escapeHtml(item.introduced_by || "自动抽取生成。")}</div>
-          <div class="task-meta">推荐操作：${escapeHtml(actionLabel(item.recommended_action || item.action))}${item.target_title ? ` → ${escapeHtml(item.target_title)}` : ""}</div>
+          <div class="task-meta">推荐操作：${escapeHtml(actionLabel(action))}${item.target_title ? ` → ${escapeHtml(item.target_title)}` : ""}</div>
           <div class="task-meta">证据来源：${escapeHtml(evidenceSources || "暂无明确来源")} · ${escapeHtml(item.evidence_count || 0)} 证据 · ${escapeHtml(item.relation_count || 0)} 关系</div>
           <div class="task-meta">${escapeHtml(truncateText(preview, 140))}</div>
-        </button>
+          ${actionButtons}
+        </article>
       `;
       },
     )
@@ -1486,13 +1832,26 @@ async function restoreConceptArchive(archiveId) {
   }
 }
 
-async function applyConceptDecision(slug, decision) {
-  const label = decision === "delete" ? "删除这个概念？" : "保留为正式概念？";
-  const ok = window.confirm(label);
-  if (!ok) return;
+async function applyConceptDecision(slug, decision, trigger = null) {
+  if (!slug) {
+    setOutput("缺少概念标识，无法处理。");
+    return;
+  }
+  if (decision === "delete") {
+    const ok = window.confirm("删除这个概念？");
+    if (!ok) return;
+  }
   const domain = state.selectedDomain || state.graphDomain || $("#graphDomainSelect").value;
+  const taskItem = trigger?.closest?.(".task-item");
+  const previousLabel = trigger?.textContent || "";
+  if (trigger) {
+    trigger.disabled = true;
+    trigger.textContent = decision === "delete" ? "删除中..." : "保留中...";
+  }
+  taskItem?.classList.add("is-processing");
   setBusy(true);
   try {
+    setOutput(decision === "delete" ? `正在删除概念：${slug}` : `正在保留概念：${slug}`);
     const result = await api("/api/concepts/decision", {
       method: "POST",
       body: JSON.stringify({
@@ -1504,7 +1863,7 @@ async function applyConceptDecision(slug, decision) {
         run_lint: $("#runLint").checked,
       }),
     });
-    setOutput(result);
+    setOutput(decision === "delete" ? `已删除概念：${result.label || slug}` : `已保留概念：${result.label || slug}`);
     const archives = archiveRecordsFromResult(result);
     if (decision === "delete" && state.currentConcept === slug) {
       state.currentConcept = "";
@@ -1521,6 +1880,11 @@ async function applyConceptDecision(slug, decision) {
     await organizeConcepts(false);
     renderArchivePanel(archives);
   } catch (error) {
+    if (trigger) {
+      trigger.disabled = false;
+      trigger.textContent = previousLabel;
+    }
+    taskItem?.classList.remove("is-processing");
     setOutput(`Error: ${error.message}`);
   } finally {
     setBusy(false);
@@ -1795,17 +2159,122 @@ async function handlePaperResultClick(event) {
 function renderWorkbench(data) {
   const stats = data.stats || {};
   $("#workbenchSummary").textContent = `${data.domain_label || data.domain} · ${stats.concept_queue || 0} 个概念待整理 · ${stats.source_queue || 0} 份资料待补`;
+  renderNextStepPanel(data);
+  renderWorkflowGuide(data);
   $("#workbenchStats").innerHTML = [
-    renderStatTile(stats.raw_sources || 0, "Raw Sources"),
-    renderStatTile(stats.source_summaries || 0, "Source Pages"),
-    renderStatTile(stats.concepts || 0, "Concepts"),
-    renderStatTile(stats.relations || 0, "Relations"),
-    renderStatTile(stats.concept_queue || 0, "Concept Queue"),
-    renderStatTile(stats.source_queue || 0, "Source Queue"),
+    renderStatTile(stats.raw_sources || 0, "原始资料"),
+    renderStatTile(stats.source_summaries || 0, "资料卡"),
+    renderStatTile(stats.concepts || 0, "概念"),
+    renderStatTile(stats.relations || 0, "关系"),
+    renderStatTile(stats.concept_queue || 0, "待审概念"),
+    renderStatTile(stats.source_queue || 0, "待补资料"),
   ].join("");
   renderConceptQueue(data.concept_queue || []);
   renderSourceQueue(data.source_queue || []);
   renderWorkbenchRecent(data.recent_sources || []);
+}
+
+function scrollToWorkbenchCard(kind) {
+  const selector = kind === "source"
+    ? "#sourceQueue"
+    : kind === "graph"
+      ? ".concept-panel"
+      : "#conceptQueue";
+  const node = $(selector);
+  if (!node) return;
+  node.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function handleNextStep(action) {
+  if (action === "supplement-sources") {
+    autoSupplementQueuedSources();
+    return;
+  }
+  if (action === "preview-organize") {
+    organizeConcepts(false);
+    return;
+  }
+  if (action === "new-source") {
+    setIntakeVisible(true);
+    $("#title").focus();
+    return;
+  }
+  if (action === "focus-source-queue") {
+    scrollToWorkbenchCard("source");
+    return;
+  }
+  if (action === "focus-graph") {
+    scrollToWorkbenchCard("graph");
+    return;
+  }
+  scrollToWorkbenchCard("concept");
+}
+
+function batchActionLabel(item) {
+  if (item.action === "would_ingest") return "待补跑 ingest";
+  if (item.action === "ingested") return item.result?.ok ? "已补跑 ingest" : "ingest 需人工检查";
+  if (item.projection_action === "would_project") return "待生成 accepted";
+  if (item.projection_action === "projected") return "已生成 accepted";
+  if (item.action === "skip_ingest") return "已具备 artifacts";
+  return item.action || item.projection_action || "无动作";
+}
+
+function renderBatchAutomationResult(result) {
+  const root = $("#batchAutomationResult");
+  if (!root || !result) return;
+  const counts = result.counts || {};
+  const items = result.items || [];
+  root.classList.remove("hidden");
+  root.innerHTML = `
+    <div class="batch-head">
+      <div>
+        <strong>${result.apply ? "批量整理已执行" : "批量整理预览"}</strong>
+        <span>${escapeHtml(result.domain || "全部学科")} · ${escapeHtml(String(counts.selected_sources || 0))} 份待处理 · ${escapeHtml(String(counts.missing_ingest || 0))} 份缺 ingest · ${escapeHtml(String(counts.missing_projection || 0))} 份缺 accepted projection</span>
+      </div>
+      <span class="batch-pill">${result.ok ? "OK" : "有失败"}</span>
+    </div>
+    ${items.length ? `
+      <div class="batch-list">
+        ${items.slice(0, 20).map((item) => `
+          <div class="batch-row">
+            <strong>${escapeHtml(item.source_path || item.source_id)}</strong>
+            <span>${escapeHtml(batchActionLabel(item))} · accepted ${escapeHtml(String(item.accepted_count || item.projection?.accepted_count || 0))}</span>
+          </div>
+        `).join("")}
+      </div>
+    ` : `<div class="empty">当前学科没有需要批量整理的旧资料。</div>`}
+  `;
+}
+
+async function runBatchAutomation(apply = false) {
+  const domain = state.selectedDomain || state.graphDomain || $("#graphDomainSelect").value || "";
+  if (apply) {
+    const ok = window.confirm("批量整理会为旧资料生成 ingest artifacts、source summary 和 accepted_concepts.json；不会写入 wiki/concepts/*.md。继续？");
+    if (!ok) return;
+  }
+  setBusy(true);
+  try {
+    const result = await api("/api/batch-automation", {
+      method: "POST",
+      body: JSON.stringify({
+        domain,
+        apply,
+        limit: apply ? 0 : 20,
+        include_completed: false,
+        overwrite: false,
+        project_accepted: true,
+      }),
+    });
+    renderBatchAutomationResult(result);
+    setOutput(result);
+    if (apply) {
+      await refresh();
+    }
+  } catch (error) {
+    setOutput(`Error: ${error.message}`);
+  } finally {
+    setBusy(false);
+  }
 }
 
 async function loadWorkbench(domain = state.graphDomain || $("#graphDomainSelect").value) {
@@ -1819,7 +2288,7 @@ async function refresh() {
     api("/api/domains"),
     api("/api/sources/recent?limit=8"),
   ]);
-  state.domains = domainData.domains;
+  state.domains = (domainData.domains || []).filter((item) => !isHiddenSystemDomain(item));
   const availableDomains = new Set(state.domains.map((item) => item.slug));
   if (!availableDomains.has(state.selectedDomain)) {
     state.selectedDomain = state.domains[0]?.slug || "";
@@ -1850,12 +2319,7 @@ async function submitSource(event) {
       body: JSON.stringify(payload),
     });
     setOutput(upload ? { upload, source: result } : result);
-    $("#sourceForm").reset();
-    $("#date").value = today;
-    $("#domain").value = result.domain;
-    $("#newDomainLabel").value = "";
-    $("#newDomainSlug").value = "";
-    switchMode(state.mode);
+    resetSourceFormAfterImport(result.domain);
     await refresh();
   } catch (error) {
     setOutput(`Error: ${error.message}`);
@@ -1966,6 +2430,10 @@ function conceptReviewContainer(sourceId) {
   return $$("[data-concept-review-source]").find((item) => item.dataset.conceptReviewSource === sourceId);
 }
 
+function relationReviewContainer(sourceId) {
+  return $$("[data-relation-review-source]").find((item) => item.dataset.relationReviewSource === sourceId);
+}
+
 function showConceptReviewError(sourceId, message) {
   const container = conceptReviewContainer(sourceId);
   if (!container) return;
@@ -2004,10 +2472,41 @@ async function reviewConceptCandidate(sourceId, candidateId, action, currentName
     });
     const result = await refreshConceptCandidates(sourceId);
     setOutput(result);
+    await loadConceptGraph(state.selectedDomain || state.graphDomain);
   } catch (error) {
     const message = `候选概念审核失败：${error.message}`;
     setOutput(message);
     showConceptReviewError(sourceId, message);
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function refreshRelationCandidates(sourceId) {
+  const container = relationReviewContainer(sourceId);
+  const result = await api(`/api/sources/${encodeURIComponent(sourceId)}/relation-candidates`);
+  if (container) {
+    container.innerHTML = renderRelationCandidateList(sourceId, result.relations || []);
+  }
+  return result;
+}
+
+async function reviewRelationCandidate(sourceId, relationId, action) {
+  if (!sourceId || !relationId || !action) {
+    setOutput("缺少候选关系审核参数。");
+    return;
+  }
+  setBusy(true);
+  try {
+    const result = await api(`/api/sources/${encodeURIComponent(sourceId)}/relation-candidates/${encodeURIComponent(relationId)}/${encodeURIComponent(action)}`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+    await refreshRelationCandidates(sourceId);
+    await loadConceptGraph(state.selectedDomain || state.graphDomain);
+    setOutput(result);
+  } catch (error) {
+    setOutput(`候选关系审核失败：${error.message}`);
   } finally {
     setBusy(false);
   }
@@ -2118,6 +2617,10 @@ function bindEvents() {
     button.addEventListener("click", () => switchMode(button.dataset.mode));
   });
   $("#hideIntakeButton").addEventListener("click", () => setIntakeVisible(false));
+  $("#topNewSourceButton").addEventListener("click", () => {
+    setIntakeVisible(true);
+    $("#title").focus();
+  });
   $("#showIntakeButton").addEventListener("click", () => {
     setIntakeVisible(true);
     $("#title").focus();
@@ -2190,6 +2693,7 @@ function bindEvents() {
   $("#domainSourceList").addEventListener("click", (event) => {
     const sourceCardButton = event.target.closest("[data-source-card-path]");
     const candidateReviewButton = event.target.closest("[data-candidate-review-action]");
+    const relationReviewButton = event.target.closest("[data-relation-review-action]");
     const reingestButton = event.target.closest("[data-source-reingest]");
     const artifactButton = event.target.closest("[data-artifact-source]");
     const autoSupplementButton = event.target.closest("[data-source-autosupplement]");
@@ -2209,6 +2713,15 @@ function bindEvents() {
         candidateReviewButton.dataset.candidateReviewId,
         candidateReviewButton.dataset.candidateReviewAction,
         candidateReviewButton.dataset.candidateReviewName || "",
+      );
+      return;
+    }
+    if (relationReviewButton) {
+      event.stopPropagation();
+      reviewRelationCandidate(
+        relationReviewButton.dataset.relationReviewSource,
+        relationReviewButton.dataset.relationReviewId,
+        relationReviewButton.dataset.relationReviewAction,
       );
       return;
     }
@@ -2263,13 +2776,61 @@ function bindEvents() {
     await selectDomain(domain);
   });
   $("#refreshGraphButton").addEventListener("click", () => loadConceptGraph($("#graphDomainSelect").value));
+  $("#backToWorkbenchButton").addEventListener("click", focusWorkbench);
+  $("#editConceptButton").addEventListener("click", () => {
+    if (!state.currentConceptPage?.slug) {
+      setOutput("请先从图谱中选择一个已有概念页。");
+      return;
+    }
+    openConceptEditor(state.currentConceptPage);
+  });
+  $("#cancelConceptEditButton").addEventListener("click", () => setConceptEditorVisible(false));
+  $("#conceptEditor").addEventListener("submit", saveConceptEditor);
   $("#keepConceptButton").addEventListener("click", keepCurrentConcept);
   $("#deleteConceptButton").addEventListener("click", deleteCurrentConcept);
   $("#refreshWorkbenchButton").addEventListener("click", () => loadWorkbench($("#graphDomainSelect").value));
+  $("#previewBatchAutomationButton").addEventListener("click", () => runBatchAutomation(false));
+  $("#runBatchAutomationButton").addEventListener("click", () => runBatchAutomation(true));
   $("#organizeConceptsButton").addEventListener("click", () => organizeConcepts(false));
   $("#applyOrganizeConceptsButton").addEventListener("click", () => organizeConcepts(true));
   $("#autoSupplementQueueButton").addEventListener("click", autoSupplementQueuedSources);
   $(".center-stage").addEventListener("click", (event) => {
+    const graphCreateButton = event.target.closest("[data-graph-create-concept]");
+    if (graphCreateButton) {
+      createConceptFromGraphLabel(graphCreateButton.dataset.graphCreateConcept);
+      return;
+    }
+    const graphEditButton = event.target.closest("[data-graph-edit-concept]");
+    if (graphEditButton) {
+      loadConceptPage(graphEditButton.dataset.graphEditConcept, state.graphDomain, { focusDetail: true })
+        .then(() => openConceptEditor(state.currentConceptPage))
+        .catch((error) => setOutput(`Error: ${error.message}`));
+      return;
+    }
+    const graphDeleteButton = event.target.closest("[data-graph-delete-concept]");
+    if (graphDeleteButton) {
+      deleteConceptPageBySlug(graphDeleteButton.dataset.graphDeleteConcept, graphDeleteButton.dataset.graphDeleteTitle || "");
+      return;
+    }
+    const graphShowSourceButton = event.target.closest("[data-graph-show-source]");
+    if (graphShowSourceButton) {
+      openSourceInManager(graphShowSourceButton.dataset.graphShowSource);
+      return;
+    }
+    const graphRemoveButton = event.target.closest("[data-graph-remove-node]");
+    if (graphRemoveButton) {
+      removeGraphNode(
+        graphRemoveButton.dataset.graphRemoveSource,
+        graphRemoveButton.dataset.graphRemoveCandidate,
+        graphRemoveButton.dataset.graphRemoveNode,
+      );
+      return;
+    }
+    const nextStepButton = event.target.closest("[data-next-step]");
+    if (nextStepButton) {
+      handleNextStep(nextStepButton.dataset.nextStep);
+      return;
+    }
     const openSourceButton = event.target.closest("[data-source-open]");
     if (openSourceButton) {
       openSourceInManager(openSourceButton.dataset.sourceOpen);
@@ -2292,7 +2853,11 @@ function bindEvents() {
     }
     const decisionButton = event.target.closest("[data-concept-decision]");
     if (decisionButton) {
-      applyConceptDecision(decisionButton.dataset.decisionSlug, decisionButton.dataset.conceptDecision);
+      applyConceptDecision(
+        decisionButton.dataset.decisionSlug,
+        decisionButton.dataset.conceptDecision,
+        decisionButton,
+      );
       return;
     }
     const mergeButton = event.target.closest("[data-concept-merge]");

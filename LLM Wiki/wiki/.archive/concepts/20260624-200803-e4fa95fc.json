@@ -1,0 +1,16 @@
+{
+  "id": "20260624-200803-e4fa95fc",
+  "created_at": "2026-06-24T20:08:03",
+  "action": "delete_manual",
+  "reason": "deleted from concept reader",
+  "label": "真信念且证成",
+  "original_path": "wiki/concepts/真信念且证成.md",
+  "archived_path": "wiki/.archive/concepts/20260624-200803-e4fa95fc-真信念且证成.md",
+  "domains": [
+    "ai智能体"
+  ],
+  "sources": [
+    "wiki/sources/2026-06-17-对transformer的批判2-transformer能输出知识吗.md"
+  ],
+  "extra": {}
+}

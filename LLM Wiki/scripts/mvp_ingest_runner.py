@@ -21,7 +21,12 @@ from mvp_ingest_artifacts import (
     write_status,
     write_text_artifact,
 )
-from mvp_subagents import extract_concept_candidates, generate_source_summary, quality_check
+from mvp_subagents import (
+    extract_concept_candidates,
+    extract_relation_candidates,
+    generate_source_summary,
+    quality_check,
+)
 
 
 RAW_SOURCES = ROOT / "raw" / "sources"
@@ -134,7 +139,9 @@ def extract_text(metadata: dict[str, Any]) -> tuple[str, dict[str, Any]]:
 
     local_path = str(metadata.get("local_path") or "").strip()
     source_url = str(metadata.get("source_url") or "").strip()
-    if local_path:
+    if original:
+        extraction = {"status": "embedded source content", "source": "raw_source", "info": {}}
+    elif local_path:
         external_text, status = auto_ingest_lib.read_local_text(local_path)
         extraction = {"status": status, "source": "local_path", "info": {"local_path": local_path}}
     elif source_url:
@@ -297,6 +304,10 @@ def run_mvp_ingest(source_path: str, overwrite: bool = False) -> dict[str, Any]:
         write_status(source_id, source_rel, "running", "EXTRACT_CONCEPTS")
         concepts = extract_concept_candidates(cleaned, metadata)
         write_json_artifact(source_id, "concept_candidates", concepts)
+
+        write_status(source_id, source_rel, "running", "EXTRACT_RELATIONS")
+        relations = extract_relation_candidates(cleaned, metadata, concepts)
+        write_json_artifact(source_id, "relation_candidates", relations)
 
         quality = quality_check(cleaned, summary, concepts, metadata)
         if quality.get("needs_human_review"):

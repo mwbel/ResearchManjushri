@@ -1,0 +1,16 @@
+{
+  "id": "20260624-200812-1c0e997a",
+  "created_at": "2026-06-24T20:08:12",
+  "action": "delete_manual",
+  "reason": "deleted from concept reader",
+  "label": "Code",
+  "original_path": "wiki/concepts/code.md",
+  "archived_path": "wiki/.archive/concepts/20260624-200812-1c0e997a-code.md",
+  "domains": [
+    "ai智能体"
+  ],
+  "sources": [
+    "wiki/sources/2026-06-17-万字长文-claude-skills完全指南-从概念到实战.md"
+  ],
+  "extra": {}
+}

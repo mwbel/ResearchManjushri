@@ -3,9 +3,9 @@ title: 交食推步参数总表
 type: concept
 status: active
 created: 2026-04-09
-updated: 2026-04-09
+updated: 2026-06-24
 summary: 汇总当前资料中时宪历交食推步开头给出的核心常数与其算法角色，便于后续拆算例和做版本比较。
-tags: [tibetan-astronomy-calendar, eclipse, parameters, shixian-calendar]
+tags: [tibetan-astronomy-calendar, parameters, curated-concept]
 sources: [raw/sources/tibetan-astronomy-calendar/藏历的原理与实践-中文.md]
 ---
 
@@ -99,3 +99,7 @@ sources: [raw/sources/tibetan-astronomy-calendar/藏历的原理与实践-中文
 
 - `raw/sources/tibetan-astronomy-calendar/藏历的原理与实践-中文.md`
 
+## Open Questions
+
+- 自动整理：已保留为独立概念页。
+- 后续可继续补充更精确的定义、边界、反例和跨学科连接。

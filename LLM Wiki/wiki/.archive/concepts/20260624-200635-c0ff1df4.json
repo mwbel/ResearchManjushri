@@ -1,0 +1,16 @@
+{
+  "id": "20260624-200635-c0ff1df4",
+  "created_at": "2026-06-24T20:06:35",
+  "action": "delete",
+  "reason": "manual decision: delete",
+  "label": "Cursor",
+  "original_path": "wiki/concepts/cursor.md",
+  "archived_path": "wiki/.archive/concepts/20260624-200635-c0ff1df4-cursor.md",
+  "domains": [
+    "ai智能体"
+  ],
+  "sources": [
+    "wiki/sources/2026-06-17-agent-skills-终极指南-入门-精通-预测.md"
+  ],
+  "extra": {}
+}

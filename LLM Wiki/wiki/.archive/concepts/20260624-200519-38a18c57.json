@@ -1,0 +1,22 @@
+{
+  "id": "20260624-200519-38a18c57",
+  "created_at": "2026-06-24T20:05:19",
+  "action": "merge",
+  "reason": "manual merge",
+  "label": "Agent Skills",
+  "original_path": "wiki/concepts/agent-skills.md",
+  "archived_path": "wiki/.archive/concepts/20260624-200519-38a18c57-agent-skills.md",
+  "domains": [
+    "ai智能体"
+  ],
+  "sources": [
+    "wiki/sources/2026-06-17-agent-skills-终极指南-入门-精通-预测.md"
+  ],
+  "extra": {
+    "target_path": "wiki/concepts/agent-skill.md",
+    "target_title": "Agent Skill",
+    "aliases_added": [
+      "Agent Skills"
+    ]
+  }
+}

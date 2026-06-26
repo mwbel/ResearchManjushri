@@ -1,0 +1,16 @@
+{
+  "id": "20260624-200845-f96c6d10",
+  "created_at": "2026-06-24T20:08:45",
+  "action": "delete_manual",
+  "reason": "deleted from concept reader",
+  "label": "Article-Copilot",
+  "original_path": "wiki/concepts/article-copilot.md",
+  "archived_path": "wiki/.archive/concepts/20260624-200845-f96c6d10-article-copilot.md",
+  "domains": [
+    "ai智能体"
+  ],
+  "sources": [
+    "wiki/sources/2026-06-17-agent-skills-终极指南-入门-精通-预测.md"
+  ],
+  "extra": {}
+}

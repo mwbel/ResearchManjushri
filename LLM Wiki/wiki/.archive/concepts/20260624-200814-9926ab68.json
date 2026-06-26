@@ -1,0 +1,16 @@
+{
+  "id": "20260624-200814-9926ab68",
+  "created_at": "2026-06-24T20:08:14",
+  "action": "delete",
+  "reason": "manual decision: delete",
+  "label": "Creator",
+  "original_path": "wiki/concepts/creator.md",
+  "archived_path": "wiki/.archive/concepts/20260624-200814-9926ab68-creator.md",
+  "domains": [
+    "ai智能体"
+  ],
+  "sources": [
+    "wiki/sources/2026-06-17-agent-skills-终极指南-入门-精通-预测.md"
+  ],
+  "extra": {}
+}

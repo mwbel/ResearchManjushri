@@ -3,9 +3,9 @@ title: Mathematics
 type: concept
 status: active
 created: 2026-04-07
-updated: 2026-06-17
+updated: 2026-06-24
 summary: 数学学科总览页，用来组织定理、证明、分支主题与跨学科基础概念。
-tags: [math, mathematics, discipline]
+tags: [math, mathematics, curated-concept]
 sources: []
 ---
 
@@ -42,9 +42,8 @@ sources: []
 
 ## Open Questions
 
-- 你的数学资料更偏基础教材、研究论文，还是历算与天文所需的计算方法？
-- 是否要优先建立一条“服务于天文学与历算”的数学主线，而不是全学科铺开？
-
+- 自动整理：已保留为独立概念页。
+- 后续可继续补充更精确的定义、边界、反例和跨学科连接。
 ## Related
 
 - [数学 Knowledge Network](../domains/math.md)

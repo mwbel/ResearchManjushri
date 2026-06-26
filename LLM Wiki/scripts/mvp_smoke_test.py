@@ -24,6 +24,7 @@ EXPECTED_ARTIFACTS = {
     "clean_text": "clean_text.txt",
     "source_summary": "source_summary.json",
     "concept_candidates": "concept_candidates.json",
+    "relation_candidates": "relation_candidates.json",
 }
 REVIEW_FILENAME = "concept_candidate_reviews.json"
 ACCEPTED_FILENAME = "accepted_concepts.json"
@@ -66,7 +67,7 @@ def request_json(base_url: str, method: str, path: str, payload: dict[str, Any] 
         return exc.code, payload_json, content_type
 
 
-def wait_for_server(base_url: str, timeout: float = 10.0) -> None:
+def wait_for_server(base_url: str, timeout: float = 20.0) -> None:
     deadline = time.time() + timeout
     while time.time() < deadline:
         try:
@@ -165,6 +166,30 @@ def get_accepted_concepts(base_url: str, source_id: str) -> dict[str, Any]:
     return payload
 
 
+def get_relation_candidates(base_url: str, source_id: str) -> dict[str, Any]:
+    status, payload, content_type = request_json(
+        base_url,
+        "GET",
+        f"/api/sources/{quote_path_segment(source_id)}/relation-candidates",
+    )
+    assert_true(status == 200, f"relation-candidates API failed: {status} {payload}")
+    assert_true(content_type.startswith("application/json"), f"relation-candidates content-type not JSON: {content_type}")
+    assert_true(payload.get("ok") is True, f"relation-candidates response not ok: {payload}")
+    return payload
+
+
+def get_accepted_graph(base_url: str, source_id: str) -> dict[str, Any]:
+    status, payload, content_type = request_json(
+        base_url,
+        "GET",
+        f"/api/sources/{quote_path_segment(source_id)}/accepted-graph",
+    )
+    assert_true(status == 200, f"accepted-graph API failed: {status} {payload}")
+    assert_true(content_type.startswith("application/json"), f"accepted-graph content-type not JSON: {content_type}")
+    assert_true(payload.get("ok") is True, f"accepted-graph response not ok: {payload}")
+    return payload
+
+
 def post_candidate_action(
     base_url: str,
     source_id: str,
@@ -184,6 +209,24 @@ def post_candidate_action(
     return response
 
 
+def post_relation_action(
+    base_url: str,
+    source_id: str,
+    relation_id: str,
+    action: str,
+) -> dict[str, Any]:
+    status, response, content_type = request_json(
+        base_url,
+        "POST",
+        f"/api/sources/{quote_path_segment(source_id)}/relation-candidates/{quote_path_segment(relation_id)}/{action}",
+        {},
+    )
+    assert_true(status == 200, f"{action} relation failed: {status} {response}")
+    assert_true(content_type.startswith("application/json"), f"{action} relation content-type not JSON: {content_type}")
+    assert_true(response.get("ok") is True, f"{action} relation response not ok: {response}")
+    return response
+
+
 def candidate_by_id(payload: dict[str, Any], candidate_id: str) -> dict[str, Any]:
     for candidate in payload.get("candidates") or []:
         if candidate.get("candidate_id") == candidate_id:
@@ -197,6 +240,14 @@ def accepted_ids(payload: dict[str, Any]) -> list[str]:
         for item in payload.get("accepted_concepts") or []
         if item.get("candidate_id")
     ]
+
+
+def post_batch_automation(base_url: str, payload: dict[str, Any]) -> dict[str, Any]:
+    status, response, content_type = request_json(base_url, "POST", "/api/batch-automation", payload)
+    assert_true(status == 200, f"batch automation failed: {status} {response}")
+    assert_true(content_type.startswith("application/json"), f"batch automation content-type not JSON: {content_type}")
+    assert_true("counts" in response and "items" in response, f"batch automation response malformed: {response}")
+    return response
 
 
 def run_smoke(base_url: str) -> dict[str, Any]:
@@ -372,6 +423,82 @@ def run_smoke(base_url: str) -> dict[str, Any]:
             accepted_ids(accepted_after_reingest) == [first_id],
             f"accepted projection was not preserved after reingest: {accepted_after_reingest}",
         )
+
+        relation_payload = get_relation_candidates(base_url, source_id)
+        relations = relation_payload.get("relations") or []
+        assert_true(relations, f"expected at least one relation candidate: {relation_payload}")
+        relation = relations[0]
+        source_candidate_id = relation["source_candidate_id"]
+        target_candidate_id = relation["target_candidate_id"]
+        post_candidate_action(base_url, source_id, source_candidate_id, "accept")
+        post_candidate_action(base_url, source_id, target_candidate_id, "accept")
+        relation_result = post_relation_action(
+            base_url,
+            source_id,
+            relation["relation_id"],
+            "accept",
+        )
+        accepted_graph = relation_result.get("accepted_graph") or get_accepted_graph(base_url, source_id)
+        assert_true(accepted_graph.get("edge_count") == 1, f"accepted graph should contain one edge: {accepted_graph}")
+        assert_true(
+            accepted_graph["edges"][0]["relation_id"] == relation["relation_id"],
+            f"accepted graph relation mismatch: {accepted_graph}",
+        )
+
+        batch_domain = f"mvp-batch-{stamp}"
+        batch_title = f"MVP Smoke 批量资料 {stamp}"
+        batch_payload = create_source_payload(
+            batch_title,
+            (
+                "批量自动化资料用于验证旧资料补跑。"
+                "Transformer、注意力机制和大语言模型用于生成候选概念。"
+            ),
+            "mvp_smoke_test 自动创建的批量资料，用于验证 batch automation。",
+            "应由 batch automation 补跑 ingest artifacts。",
+        )
+        batch_payload.update(
+            {
+                "domain": batch_domain,
+                "auto_ingest": False,
+                "concept_network": False,
+                "rebuild_domain": False,
+                "rebuild_index": False,
+            }
+        )
+        batch_status, batch_response, _ = request_json(base_url, "POST", "/api/sources", batch_payload)
+        assert_true(batch_status == 200, f"batch source create failed: HTTP {batch_status} {batch_response}")
+        assert_true(batch_response.get("ok") is True, f"batch source response not ok: {batch_response}")
+        batch_source_path = batch_response.get("path")
+        created_paths.append(batch_source_path)
+
+        batch_dry_run = post_batch_automation(
+            base_url,
+            {
+                "domain": batch_domain,
+                "apply": False,
+                "project_accepted": True,
+            },
+        )
+        assert_true(batch_dry_run["counts"]["selected_sources"] == 1, f"batch dry-run should select one source: {batch_dry_run}")
+        assert_true(batch_dry_run["items"][0]["action"] == "would_ingest", f"batch dry-run action mismatch: {batch_dry_run}")
+
+        batch_apply = post_batch_automation(
+            base_url,
+            {
+                "domain": batch_domain,
+                "apply": True,
+                "project_accepted": True,
+            },
+        )
+        assert_true(batch_apply["counts"]["ingested"] == 1, f"batch apply should ingest one source: {batch_apply}")
+        batch_item = batch_apply["items"][0]
+        batch_source_id = batch_item["source_id"]
+        source_ids.append(batch_source_id)
+        assert_true(artifact_dir_for(batch_source_id).exists(), f"batch artifact dir missing: {batch_source_id}")
+        assert_true((artifact_dir_for(batch_source_id) / "concept_candidates.json").exists(), "batch concept candidates missing")
+        assert_true((artifact_dir_for(batch_source_id) / "accepted_concepts.json").exists(), "batch accepted projection missing")
+        batch_wiki_source = (batch_item.get("result") or {}).get("wiki_source_path") or ""
+        created_paths.append(batch_wiki_source)
 
         blocked_title = f"MVP Smoke 微信风控 {stamp}"
         blocked_payload = create_source_payload(

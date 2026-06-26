@@ -1,0 +1,16 @@
+{
+  "id": "20260624-200619-299233cc",
+  "created_at": "2026-06-24T20:06:19",
+  "action": "delete",
+  "reason": "manual decision: delete",
+  "label": "Anthropic",
+  "original_path": "wiki/concepts/anthropic.md",
+  "archived_path": "wiki/.archive/concepts/20260624-200619-299233cc-anthropic.md",
+  "domains": [
+    "ai智能体"
+  ],
+  "sources": [
+    "wiki/sources/2026-06-17-agent-skills-终极指南-入门-精通-预测.md"
+  ],
+  "extra": {}
+}

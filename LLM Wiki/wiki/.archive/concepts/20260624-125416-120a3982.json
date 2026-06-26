@@ -1,0 +1,28 @@
+{
+  "id": "20260624-125416-120a3982",
+  "created_at": "2026-06-24T12:54:16",
+  "action": "merge",
+  "reason": "manual merge",
+  "label": "大语言模型",
+  "original_path": "wiki/concepts/大语言模型.md",
+  "archived_path": "wiki/.archive/concepts/20260624-125416-120a3982-大语言模型.md",
+  "domains": [
+    "ai智能体",
+    "世界模型",
+    "ai"
+  ],
+  "sources": [
+    "wiki/sources/2026-06-17-对transformer的批判2-transformer能输出知识吗.md",
+    "wiki/sources/2026-06-17-全面解析-世界模型-定义-路线-实践与agi的更近一步.md",
+    "wiki/sources/2026-06-17-人工智能的数学革命已经到来.md"
+  ],
+  "extra": {
+    "target_path": "wiki/concepts/llm.md",
+    "target_title": "LLM",
+    "aliases_added": [
+      "大语言模型",
+      "Large Language Model",
+      "Large Language Models"
+    ]
+  }
+}

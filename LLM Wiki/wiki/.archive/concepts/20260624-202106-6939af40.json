@@ -1,0 +1,16 @@
+{
+  "id": "20260624-202106-6939af40",
+  "created_at": "2026-06-24T20:21:06",
+  "action": "delete_manual",
+  "reason": "deleted from concept reader",
+  "label": "Modern Astronomy",
+  "original_path": "wiki/concepts/modern-astronomy.md",
+  "archived_path": "wiki/.archive/concepts/20260624-202106-6939af40-modern-astronomy.md",
+  "domains": [
+    "modern-astronomy",
+    "astronomy",
+    "discipline"
+  ],
+  "sources": [],
+  "extra": {}
+}

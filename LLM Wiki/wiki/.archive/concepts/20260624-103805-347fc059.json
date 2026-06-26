@@ -1,0 +1,16 @@
+{
+  "id": "20260624-103805-347fc059",
+  "created_at": "2026-06-24T10:38:05",
+  "action": "delete_manual",
+  "reason": "deleted from concept reader",
+  "label": "你可以一次解决成千上万个问题",
+  "original_path": "wiki/concepts/你可以一次解决成千上万个问题.md",
+  "archived_path": "wiki/.archive/concepts/20260624-103805-347fc059-你可以一次解决成千上万个问题.md",
+  "domains": [
+    "ai"
+  ],
+  "sources": [
+    "wiki/sources/2026-06-17-人工智能的数学革命已经到来.md"
+  ],
+  "extra": {}
+}

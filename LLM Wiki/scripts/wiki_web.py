@@ -37,6 +37,7 @@ SCIVERSE_KEYCHAIN_SERVICE = os.environ.get("SCIVERSE_KEYCHAIN_SERVICE", "llm-wik
 
 sys.path.insert(0, str(SCRIPT_DIR))
 import auto_ingest as auto_ingest_lib  # noqa: E402
+import mvp_batch_automation  # noqa: E402
 import mvp_concept_reviews  # noqa: E402
 import mvp_ingest_artifacts as mvp_artifacts  # noqa: E402
 from mvp_ingest_runner import run_mvp_ingest  # noqa: E402
@@ -53,13 +54,24 @@ MIME_TYPES = {
 
 
 DOMAIN_OPTIONS = [
-    ("general", "通用"),
-    ("llm-wiki", "LLM Wiki"),
+    ("ai", "ai"),
+    ("ai智能体", "ai智能体"),
     ("math", "数学"),
+    ("modern-astronomy", "现代天文学"),
     ("physics", "物理"),
     ("tibetan-astronomy-calendar", "西藏天文历算"),
-    ("modern-astronomy", "现代天文学"),
+    ("世界模型", "世界模型"),
+    ("垂直小模型", "垂直小模型"),
 ]
+AUTO_DISCOVER_DOMAINS = False
+
+
+def allowed_domain_slugs() -> set[str]:
+    return {slug for slug, _label in DOMAIN_OPTIONS}
+
+
+def is_allowed_domain(domain_slug: str) -> bool:
+    return domain_slug in allowed_domain_slugs()
 
 
 def read_json(handler: BaseHTTPRequestHandler) -> dict:
@@ -636,15 +648,12 @@ def resolve_payload_domain(payload: dict) -> tuple[str, str]:
     new_slug = clean_text(payload.get("new_domain_slug"))
 
     if requested == "__new__" or new_label or new_slug:
-        domain_label = new_label or new_slug
-        if not domain_label:
-            raise ValueError("新增学科需要填写名称")
-        domain_slug = slugify(new_slug or domain_label)
-        if not domain_slug:
-            raise ValueError("新增学科标识不能为空")
-        return domain_slug, domain_label
+        raise ValueError("已禁用自动新增学科。请先选择现有学科。")
 
-    return resolve_domain(requested)
+    domain_slug, domain_label = resolve_domain(requested)
+    if not is_allowed_domain(domain_slug):
+        raise ValueError(f"已禁用自动新增学科：{domain_slug}")
+    return domain_slug, domain_label
 
 
 def save_upload(payload: dict) -> dict:
@@ -710,6 +719,36 @@ def domain_label_for(domain_slug: str, fallback: str | None = None) -> str:
         or fallback
         or domain_slug
     )
+
+
+def enrich_wechat_payload(payload: dict) -> tuple[dict, dict]:
+    enriched = dict(payload)
+    source_url = clean_text(enriched.get("source_url") or enriched.get("url"))
+    if "mp.weixin.qq.com" not in source_url:
+        return enriched, {}
+    needs_fetch = not clean_text(enriched.get("title")) or not clean_text(enriched.get("original_content"))
+    if not needs_fetch:
+        return enriched, {}
+    text, status, info = auto_ingest_lib.fetch_wechat_with_crawler(source_url)
+    if not text:
+        raise ValueError(f"微信文章抓取失败：{status}")
+    if not clean_text(enriched.get("title")):
+        enriched["title"] = clean_text(info.get("title")) or "微信文章"
+    if not clean_text(enriched.get("author")):
+        enriched["author"] = clean_text(info.get("author"))
+    if not clean_text(enriched.get("published")):
+        enriched["published"] = clean_text(info.get("publish_time"))
+    if not clean_text(enriched.get("date")) and clean_text(info.get("publish_time")):
+        enriched["date"] = clean_text(info.get("publish_time"))[:10]
+    if not clean_text(enriched.get("original_content")):
+        enriched["original_content"] = text[:120_000]
+    return enriched, {
+        "status": status,
+        "title": clean_text(info.get("title")),
+        "author": clean_text(info.get("author")),
+        "published": clean_text(info.get("publish_time")),
+        "extracted_chars": len(text),
+    }
 
 
 def build_source_payload(payload: dict) -> tuple[Path, str, dict]:
@@ -778,7 +817,8 @@ def build_source_payload(payload: dict) -> tuple[Path, str, dict]:
 
 
 def create_source(payload: dict, dry_run: bool = False) -> dict:
-    target, content, meta = build_source_payload(payload)
+    enriched_payload, import_info = enrich_wechat_payload(payload)
+    target, content, meta = build_source_payload(enriched_payload)
     if target.exists() and not dry_run:
         raise FileExistsError(f"文件已存在：{target.relative_to(ROOT)}")
 
@@ -791,17 +831,25 @@ def create_source(payload: dict, dry_run: bool = False) -> dict:
     summary_path = ""
     ingest_result: dict | None = None
     domain_slug = meta["domain_slug"]
-    if not dry_run and payload.get("auto_ingest", False):
+    if not dry_run and enriched_payload.get("auto_ingest", False):
         actions, summary_path, ingest_result = run_mvp_ingest_pipeline(
             meta["relative_path"],
-            {**payload, "overwrite_ingest": True},
+            {**enriched_payload, "overwrite_ingest": True},
         )
+        if ingest_result and ingest_result.get("source_id"):
+            source_id = ingest_result["source_id"]
+            try:
+                ingest_result["concept_reviews"] = mvp_concept_reviews.merged_candidates(source_id)
+                ingest_result["relation_reviews"] = mvp_concept_reviews.merged_relations(source_id)
+                ingest_result["accepted_graph"] = mvp_concept_reviews.project_accepted_graph(source_id)
+            except FileNotFoundError:
+                pass
     elif not dry_run:
-        if payload.get("rebuild_domain", True):
+        if enriched_payload.get("rebuild_domain", True):
             actions.append(shell_run(["python3", "scripts/rebuild_domain_network.py", "--domain", domain_slug]))
-        if payload.get("rebuild_index", True):
+        if enriched_payload.get("rebuild_index", True):
             actions.append(shell_run(["python3", "scripts/rebuild_index.py"]))
-        if payload.get("run_lint", False):
+        if enriched_payload.get("run_lint", False):
             actions.append(shell_run(["python3", "scripts/lint_wiki.py"]))
 
     return {
@@ -811,6 +859,7 @@ def create_source(payload: dict, dry_run: bool = False) -> dict:
         "domain": domain_slug,
         "summary": summary_path,
         "ingest_result": ingest_result,
+        "import_info": import_info,
         "content": content if dry_run else "",
         "actions": actions,
     }
@@ -1121,11 +1170,11 @@ def list_domains() -> dict:
     domains = []
     deleted_domains = load_deleted_domains()
     known = {slug: label for slug, label in DOMAIN_OPTIONS if slug not in deleted_domains}
-    if RAW_SOURCES.exists():
+    if AUTO_DISCOVER_DOMAINS and RAW_SOURCES.exists():
         for path in RAW_SOURCES.iterdir():
             if path.is_dir() and not path.name.startswith("."):
                 known.setdefault(path.name, domain_label_for(path.name))
-    if DOMAIN_PAGES.exists():
+    if AUTO_DISCOVER_DOMAINS and DOMAIN_PAGES.exists():
         for path in DOMAIN_PAGES.glob("*.md"):
             if not path.name.startswith(".") and path.stem not in deleted_domains:
                 known.setdefault(path.stem, domain_label_for(path.stem))
@@ -1200,6 +1249,7 @@ def mvp_ingest_preview(path: Path) -> dict:
             "status": None,
             "summary": None,
             "concept_candidates": [],
+            "relation_candidates": [],
         }
 
     status = mvp_artifacts.read_status(source_id)
@@ -1218,6 +1268,14 @@ def mvp_ingest_preview(path: Path) -> dict:
         concept_reviews = mvp_concept_reviews.merged_candidates(source_id)
     except Exception:
         concept_reviews = None
+    try:
+        relation_reviews = mvp_concept_reviews.merged_relations(source_id)
+    except Exception:
+        relation_reviews = None
+    try:
+        accepted_graph = mvp_concept_reviews.project_accepted_graph(source_id)
+    except Exception:
+        accepted_graph = None
 
     return {
         "source_id": source_id,
@@ -1226,6 +1284,8 @@ def mvp_ingest_preview(path: Path) -> dict:
         "summary": summary,
         "concept_candidates": concepts[:10],
         "concept_reviews": concept_reviews,
+        "relation_reviews": relation_reviews,
+        "accepted_graph": accepted_graph,
     }
 
 
@@ -1386,6 +1446,17 @@ def extract_external_source_text(meta: dict[str, str]) -> tuple[str, str, dict[s
     return "", "skipped: no source_url or local_path", {}
 
 
+def source_summary_fallback_text(raw_rel: str) -> str:
+    snippets: list[str] = []
+    for summary_path in source_summary_paths_for_raw(raw_rel):
+        _meta, summary_body = parse_frontmatter_and_body(summary_path)
+        snippets.extend(markdown_list_items(summary_body, "## Main Takeaways", 8))
+        snippets.extend(markdown_list_items(summary_body, "## Extracted Notes", 8))
+    cleaned = [strip_markdown_inline(item) for item in snippets]
+    cleaned = [item for item in cleaned if item and "待补" not in item]
+    return "\n".join(f"- {item}" for item in cleaned[:12]).strip()
+
+
 def automatic_source_context(title: str, domain_label: str) -> str:
     return (
         f"自动补充：这份资料属于「{domain_label}」资料库，用于补强《{title}》相关的核心观点、"
@@ -1424,6 +1495,13 @@ def auto_supplement_proposal(payload: dict) -> dict:
     external_text = auto_ingest_lib.remove_placeholders(external_text)
     if external_text and auto_ingest_lib.is_blocked_or_boilerplate(external_text):
         external_text = ""
+    if clean_text(meta.get("local_path")) and extraction_status == "local path not found":
+        raise FileNotFoundError(f"文件不存在：{clean_text(meta.get('local_path'))}")
+    if not external_text:
+        fallback_text = source_summary_fallback_text(str(path.relative_to(ROOT)))
+        if fallback_text:
+            external_text = fallback_text
+            extraction_status = "source summary fallback"
 
     context = sections.get("Context", "")
     original_content = sections.get("Original Content Or Extract", "")
@@ -2104,7 +2182,7 @@ def concept_organize_action(path: Path, domain_slug: str, catalog_by_slug: dict[
         "auto_concept": is_auto,
         "curated_concept": is_curated,
     }
-    if is_curated and not reason:
+    if is_curated:
         return {
             **base,
             "action": "already_curated",
@@ -2415,7 +2493,27 @@ def restore_concept_archive(payload: dict) -> dict:
     }
 
 
-def source_review_reason(body: str, meta: dict[str, str]) -> str:
+def source_ingest_ready(raw_rel: str) -> bool:
+    if not raw_rel:
+        return False
+    try:
+        raw_path = raw_path_from_relative(raw_rel)
+        source_id = mvp_artifacts.source_id_for_path(raw_path)
+        status = mvp_artifacts.read_status(source_id) or {}
+    except Exception:
+        return False
+    artifacts = status.get("artifacts") or {}
+    return (
+        status.get("status") == "completed"
+        and bool(artifacts.get("clean_text"))
+        and bool(artifacts.get("source_summary"))
+        and bool(artifacts.get("concept_candidates"))
+    )
+
+
+def source_review_reason(body: str, meta: dict[str, str], raw_sources: list[str] | None = None) -> str:
+    if raw_sources and any(source_ingest_ready(source) for source in raw_sources):
+        return ""
     summary = meta.get("summary", "")
     if "等待补充" in summary or "已登记" in summary:
         return "需要补充摘要或正文"
@@ -2445,13 +2543,13 @@ def workbench(domain_slug: str | None = None) -> dict:
         meta, body = parse_frontmatter_and_body(path)
         if summary_domain(path, meta) != domain_slug:
             continue
-        reason = source_review_reason(body, meta)
-        if not reason:
-            continue
         raw_sources = [
             source for source in parse_inline_list(meta.get("sources"))
             if source.startswith("raw/sources/")
         ]
+        reason = source_review_reason(body, meta, raw_sources)
+        if not reason:
+            continue
         source_queue.append(
             {
                 "title": meta.get("title", path.stem).replace("Source - ", ""),
@@ -2565,30 +2663,41 @@ def concept_graph(domain_slug: str) -> dict:
     if not domain_slug:
         domain_slug = "general"
 
-    nodes_by_label: dict[str, dict] = {}
+    nodes_by_id: dict[str, dict] = {}
     edges: list[dict] = []
     relation_pattern = re.compile(r"^-\s+`([^`]+)`\s+--(.+?)-->\s+`([^`]+)`(?:\s+\((.+)\))?")
 
-    def add_node(label: str, path: str = "") -> None:
+    def add_node(label: str, path: str = "", extra: dict | None = None) -> None:
         if not label:
             return
         node_id = slugify(label)
-        existing = nodes_by_label.get(label)
+        existing = nodes_by_id.get(node_id)
         if existing:
             if path and not existing.get("path"):
                 existing["path"] = path
+            if extra:
+                existing.update({key: value for key, value in extra.items() if value})
             return
-        nodes_by_label[label] = {
+        nodes_by_id[node_id] = {
             "id": node_id,
             "label": label,
             "path": path,
+            **({key: value for key, value in (extra or {}).items() if value}),
         }
 
     concept_files = concept_files_for_domain(domain_slug)
     for path in concept_files:
         meta = parse_frontmatter(path)
         title = meta.get("title") or path.stem
-        add_node(title, str(path.relative_to(ROOT)))
+        raw_source_paths = [
+            source for source in parse_inline_list(meta.get("sources"))
+            if source.startswith("raw/sources/")
+        ]
+        add_node(
+            title,
+            str(path.relative_to(ROOT)),
+            {"source_paths": raw_source_paths},
+        )
         for line in path.read_text(encoding="utf-8").splitlines():
             match = relation_pattern.match(line.strip())
             if not match:
@@ -2612,13 +2721,65 @@ def concept_graph(domain_slug: str) -> dict:
                 }
             )
 
+    for artifact_dir in sorted(mvp_artifacts.ARTIFACT_ROOT.glob("*")):
+        accepted_path = artifact_dir / "accepted_graph.json"
+        if not accepted_path.exists():
+            continue
+        try:
+            accepted_graph = json.loads(accepted_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if clean_text(accepted_graph.get("domain")) != domain_slug:
+            continue
+        source_path = clean_text(accepted_graph.get("source_path"))
+        graph_source_id = clean_text(accepted_graph.get("source_id"))
+        for item in accepted_graph.get("nodes") or []:
+            label = clean_text(item.get("display_name") or item.get("name"))
+            item_source_path = clean_text(item.get("source_path")) or source_path
+            add_node(
+                label,
+                clean_text(item.get("path")),
+                {
+                    "source_id": clean_text(item.get("source_id")) or graph_source_id,
+                    "candidate_id": clean_text(item.get("candidate_id")),
+                    "node_source": clean_text(item.get("node_source")) or clean_text(item.get("source")),
+                    "source_path": item_source_path,
+                    "source_paths": [item_source_path] if item_source_path else [],
+                },
+            )
+        for item in accepted_graph.get("edges") or []:
+            source = clean_text(item.get("source"))
+            target = clean_text(item.get("target"))
+            relation = clean_text(item.get("relation")) or "相关"
+            if not source or not target:
+                continue
+            add_node(source)
+            add_node(target)
+            edge_id = f"{slugify(source)}::{slugify(relation)}::{slugify(target)}"
+            if any(edge["id"] == edge_id for edge in edges):
+                continue
+            edges.append(
+                {
+                    "id": edge_id,
+                    "source": slugify(source),
+                    "source_label": source,
+                    "relation": relation,
+                    "target": slugify(target),
+                    "target_label": target,
+                    "evidence": clean_text(item.get("evidence_quote")),
+                    "concept_page": "",
+                    "source_path": source_path,
+                    "projection": "accepted_graph",
+                }
+            )
+
     return {
         "domain": domain_slug,
         "domain_label": domain_label_for(domain_slug),
-        "nodes": sorted(nodes_by_label.values(), key=lambda node: node["label"].lower()),
+        "nodes": sorted(nodes_by_id.values(), key=lambda node: node["label"].lower()),
         "edges": edges,
         "relations": edges,
-        "concept_count": len(concept_files),
+        "concept_count": len(nodes_by_id),
         "relation_count": len(edges),
         "domain_page": str((DOMAIN_PAGES / f"{domain_slug}.md").relative_to(ROOT)),
     }
@@ -2667,6 +2828,163 @@ def concept_page(slug: str, domain_slug: str | None = None) -> dict:
         "introduced_by": concept_introduction_reason(meta, body),
         "catalog": concept_catalog(domain) if domain else concept_catalog(),
         "related_edges": related_edges,
+    }
+
+
+def concept_markdown_body(title: str, summary: str, body: str = "") -> str:
+    cleaned = clean_text(body)
+    if cleaned:
+        return cleaned.rstrip() + "\n"
+    definition = summary or f"{title} 的工作定义待补。"
+    return "\n".join(
+        [
+            f"# {title}",
+            "",
+            "## Working Definition",
+            "",
+            f"- {definition}",
+            "",
+            "## Source-Derived Evidence",
+            "",
+            "- 待补：暂无来源证据。",
+            "",
+            "## Source-Derived Relations",
+            "",
+            "- 待补：暂无稳定关系。",
+            "",
+            "## Open Questions",
+            "",
+            "- 待补：这个概念的边界和来源证据需要继续整理。",
+            "",
+        ]
+    )
+
+
+def create_concept(payload: dict) -> dict:
+    title = clean_text(payload.get("title"))
+    domain_slug = clean_text(payload.get("domain")) or "general"
+    if not title:
+        raise ValueError("缺少概念标题")
+    slug = slugify(clean_text(payload.get("slug")) or title)
+    path = WIKI_CONCEPTS / f"{slug}.md"
+    if path.exists():
+        raise FileExistsError(f"概念已存在：{path.relative_to(ROOT)}")
+
+    today = dt.date.today().isoformat()
+    summary = clean_text(payload.get("summary")) or f"{title} 的概念页。"
+    aliases = parse_extra_tags(clean_text(payload.get("aliases")))
+    tags = [domain_slug, "curated-concept"]
+    content = "\n".join(
+        [
+            "---",
+            f"title: {title}",
+            "type: concept",
+            "status: active",
+            f"created: {today}",
+            f"updated: {today}",
+            f"summary: {summary}",
+            f"tags: {inline_list(tags)}",
+            f"aliases: {inline_list(aliases)}",
+            "sources: []",
+            "---",
+            "",
+            concept_markdown_body(title, summary, clean_text(payload.get("body"))).rstrip(),
+            "",
+        ]
+    )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+    actions = rebuild_after_concept_change([domain_slug], payload)
+    return {
+        "ok": all(action["ok"] for action in actions) if actions else True,
+        "created": str(path.relative_to(ROOT)),
+        "slug": path.stem,
+        "domain": domain_slug,
+        "page": concept_page(path.stem, domain_slug),
+        "actions": actions,
+    }
+
+
+def update_concept(payload: dict) -> dict:
+    slug = clean_text(payload.get("slug"))
+    domain_slug = clean_text(payload.get("domain")) or "general"
+    if not slug:
+        raise ValueError("缺少 concept slug")
+    path = concept_file_by_slug(slug)
+    meta, existing_body = parse_frontmatter_and_body(path)
+    title = clean_text(payload.get("title")) or meta.get("title") or path.stem
+    summary = clean_text(payload.get("summary")) or meta.get("summary") or ""
+    aliases = parse_extra_tags(clean_text(payload.get("aliases"))) if "aliases" in payload else parse_inline_list(meta.get("aliases"))
+    tags = parse_inline_list(meta.get("tags"))
+    if domain_slug and domain_slug not in tags:
+        tags.insert(0, domain_slug)
+    if "curated-concept" not in tags:
+        tags.append("curated-concept")
+    body = clean_text(payload.get("body")) if "body" in payload else existing_body
+
+    frontmatter, _ = split_frontmatter(path)
+    updates = {
+        "title": title,
+        "status": clean_text(payload.get("status")) or meta.get("status") or "active",
+        "updated": dt.date.today().isoformat(),
+        "summary": summary,
+        "tags": inline_list(tags),
+        "aliases": inline_list(aliases),
+    }
+    seen = set()
+    updated_frontmatter = [frontmatter[0]] if frontmatter else ["---"]
+    for line in frontmatter[1:-1]:
+        if ":" not in line:
+            updated_frontmatter.append(line)
+            continue
+        key = line.split(":", 1)[0].strip()
+        if key in updates:
+            updated_frontmatter.append(f"{key}: {updates[key]}")
+            seen.add(key)
+        else:
+            updated_frontmatter.append(line)
+    for key, value in updates.items():
+        if key not in seen:
+            updated_frontmatter.append(f"{key}: {value}")
+    updated_frontmatter.append("---")
+    path.write_text("\n".join([*updated_frontmatter, "", concept_markdown_body(title, summary, body).rstrip(), ""]).rstrip() + "\n", encoding="utf-8")
+    actions = rebuild_after_concept_change([domain_slug], payload)
+    return {
+        "ok": all(action["ok"] for action in actions) if actions else True,
+        "updated": str(path.relative_to(ROOT)),
+        "slug": path.stem,
+        "domain": domain_slug,
+        "page": concept_page(path.stem, domain_slug),
+        "actions": actions,
+    }
+
+
+def delete_graph_node(payload: dict) -> dict:
+    source_id = clean_text(payload.get("source_id"))
+    candidate_id = clean_text(payload.get("candidate_id"))
+    label = clean_text(payload.get("label"))
+    domain_slug = clean_text(payload.get("domain")) or "general"
+    if not source_id or not candidate_id:
+        if not label:
+            raise ValueError("删除图谱节点需要 source_id/candidate_id 或 label")
+        cleaned_refs = remove_concept_relation_refs(label)
+        actions = rebuild_after_concept_change([domain_slug], payload)
+        return {
+            "ok": all(action["ok"] for action in actions) if actions else True,
+            "domain": domain_slug,
+            "label": label,
+            "removed_relation_refs": cleaned_refs,
+            "actions": actions,
+        }
+    result = mvp_concept_reviews.update_review(source_id, candidate_id, "reject")
+    graph = mvp_concept_reviews.project_accepted_graph(source_id)
+    return {
+        "ok": True,
+        "domain": domain_slug,
+        "source_id": source_id,
+        "candidate_id": candidate_id,
+        "review": result,
+        "accepted_graph": graph,
     }
 
 
@@ -2970,6 +3288,30 @@ class WikiWebHandler(BaseHTTPRequestHandler):
                     HTTPStatus.NOT_FOUND,
                 )
             return
+        relation_match = re.fullmatch(r"/api/sources/([^/]+)/relation-candidates", parsed.path)
+        if relation_match:
+            source_id = unquote(relation_match.group(1))
+            try:
+                write_json(self, mvp_concept_reviews.merged_relations(source_id))
+            except FileNotFoundError:
+                write_json(
+                    self,
+                    {"ok": False, "error": f"Relation candidates not found: {source_id}"},
+                    HTTPStatus.NOT_FOUND,
+                )
+            return
+        accepted_graph_match = re.fullmatch(r"/api/sources/([^/]+)/accepted-graph", parsed.path)
+        if accepted_graph_match:
+            source_id = unquote(accepted_graph_match.group(1))
+            try:
+                write_json(self, mvp_concept_reviews.project_accepted_graph(source_id))
+            except FileNotFoundError:
+                write_json(
+                    self,
+                    {"ok": False, "error": f"Accepted graph inputs not found: {source_id}"},
+                    HTTPStatus.NOT_FOUND,
+                )
+            return
         artifact_match = re.fullmatch(r"/api/sources/([^/]+)/artifacts/([^/]+)", parsed.path)
         if artifact_match:
             source_id = unquote(artifact_match.group(1))
@@ -3030,6 +3372,15 @@ class WikiWebHandler(BaseHTTPRequestHandler):
             if parsed.path == "/api/concepts/academic-evidence":
                 write_json(self, add_academic_evidence(payload))
                 return
+            if parsed.path == "/api/concepts/create":
+                write_json(self, create_concept(payload))
+                return
+            if parsed.path == "/api/concepts/update":
+                write_json(self, update_concept(payload))
+                return
+            if parsed.path == "/api/concepts/graph-node/delete":
+                write_json(self, delete_graph_node(payload))
+                return
             if parsed.path == "/api/concepts/delete":
                 write_json(self, delete_concept(payload))
                 return
@@ -3045,6 +3396,19 @@ class WikiWebHandler(BaseHTTPRequestHandler):
             if parsed.path == "/api/concepts/restore":
                 write_json(self, restore_concept_archive(payload))
                 return
+            if parsed.path == "/api/batch-automation":
+                write_json(
+                    self,
+                    mvp_batch_automation.batch_automation(
+                        domain=clean_text(payload.get("domain")) or None,
+                        apply=bool(payload.get("apply")),
+                        limit=int(payload.get("limit") or 0) or None,
+                        include_completed=bool(payload.get("include_completed")),
+                        overwrite=bool(payload.get("overwrite")),
+                        project_accepted=payload.get("project_accepted", True) is not False,
+                    ),
+                )
+                return
             reingest_match = re.fullmatch(r"/api/sources/([^/]+)/reingest", parsed.path)
             if reingest_match:
                 source_id = unquote(reingest_match.group(1))
@@ -3055,6 +3419,8 @@ class WikiWebHandler(BaseHTTPRequestHandler):
                 result = run_mvp_ingest(str(source_path.relative_to(ROOT)), overwrite=True)
                 try:
                     result["accepted_concepts"] = mvp_concept_reviews.project_accepted_concepts(source_id)
+                    result["relation_reviews"] = mvp_concept_reviews.merged_relations(source_id)
+                    result["accepted_graph"] = mvp_concept_reviews.project_accepted_graph(source_id)
                 except FileNotFoundError:
                     pass
                 write_json(self, result)
@@ -3080,6 +3446,33 @@ class WikiWebHandler(BaseHTTPRequestHandler):
                     write_json(
                         self,
                         {"ok": False, "error": f"Concept candidates not found: {source_id}"},
+                        HTTPStatus.NOT_FOUND,
+                    )
+                except LookupError as exc:
+                    write_json(self, {"ok": False, "error": str(exc)}, HTTPStatus.NOT_FOUND)
+                return
+            relation_action_match = re.fullmatch(
+                r"/api/sources/([^/]+)/relation-candidates/([^/]+)/(accept|reject|note)",
+                parsed.path,
+            )
+            if relation_action_match:
+                source_id = unquote(relation_action_match.group(1))
+                relation_id = unquote(relation_action_match.group(2))
+                action = unquote(relation_action_match.group(3))
+                try:
+                    write_json(
+                        self,
+                        mvp_concept_reviews.update_relation_review(
+                            source_id,
+                            relation_id,
+                            action,
+                            note=payload.get("note"),
+                        ),
+                    )
+                except FileNotFoundError:
+                    write_json(
+                        self,
+                        {"ok": False, "error": f"Relation candidates not found: {source_id}"},
                         HTTPStatus.NOT_FOUND,
                     )
                 except LookupError as exc:

@@ -3,9 +3,9 @@ title: Physics
 type: concept
 status: active
 created: 2026-04-07
-updated: 2026-06-17
+updated: 2026-06-24
 summary: 物理学科总览页，用来组织理论分支、模型、实验与和天文学的连接。
-tags: [physics, discipline]
+tags: [physics, curated-concept]
 sources: []
 ---
 
@@ -42,9 +42,8 @@ sources: []
 
 ## Open Questions
 
-- 你的物理资料更偏教材体系、专题研究，还是服务于现代天文学理解？
-- 是否需要单独建立“物理中的天文相关概念”专题页？
-
+- 自动整理：已保留为独立概念页。
+- 后续可继续补充更精确的定义、边界、反例和跨学科连接。
 ## Related
 
 - [物理 Knowledge Network](../domains/physics.md)

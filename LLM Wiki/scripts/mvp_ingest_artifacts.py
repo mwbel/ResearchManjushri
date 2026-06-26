@@ -22,7 +22,9 @@ ARTIFACT_FILES = {
     "clean_text": "clean_text.txt",
     "source_summary": "source_summary.json",
     "concept_candidates": "concept_candidates.json",
+    "relation_candidates": "relation_candidates.json",
     "accepted_concepts": "accepted_concepts.json",
+    "accepted_graph": "accepted_graph.json",
     "error": "error.json",
 }
 
@@ -33,6 +35,7 @@ STEP_VALUES = {
     "CLEAN_TEXT",
     "SUMMARIZE",
     "EXTRACT_CONCEPTS",
+    "EXTRACT_RELATIONS",
     "WRITE_WIKI_SOURCE",
     "COMPLETED",
     "FAILED",
@@ -118,7 +121,9 @@ def artifact_flags(source_id: str) -> dict[str, bool]:
         "clean_text": artifact_path(source_id, "clean_text").exists(),
         "source_summary": artifact_path(source_id, "source_summary").exists(),
         "concept_candidates": artifact_path(source_id, "concept_candidates").exists(),
+        "relation_candidates": artifact_path(source_id, "relation_candidates").exists(),
         "accepted_concepts": artifact_path(source_id, "accepted_concepts").exists(),
+        "accepted_graph": artifact_path(source_id, "accepted_graph").exists(),
     }
 
 

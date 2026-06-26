@@ -1,0 +1,16 @@
+{
+  "id": "20260624-200740-25cca01f",
+  "created_at": "2026-06-24T20:07:40",
+  "action": "delete_manual",
+  "reason": "deleted from concept reader",
+  "label": "不完全的归纳法",
+  "original_path": "wiki/concepts/不完全的归纳法.md",
+  "archived_path": "wiki/.archive/concepts/20260624-200740-25cca01f-不完全的归纳法.md",
+  "domains": [
+    "ai智能体"
+  ],
+  "sources": [
+    "wiki/sources/2026-06-17-对transformer的批判2-transformer能输出知识吗.md"
+  ],
+  "extra": {}
+}

@@ -90,15 +90,15 @@ h2 {
 
 .workspace {
   display: grid;
-  grid-template-columns: 340px minmax(0, 1fr) 340px;
-  gap: 18px;
+  grid-template-columns: 300px minmax(0, 1fr) 300px;
+  gap: 14px;
   align-items: start;
 }
 
 .nav-rail,
 .composer-rail {
   display: grid;
-  gap: 18px;
+  gap: 12px;
   align-content: start;
 }
 
@@ -119,7 +119,7 @@ h2 {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 8px;
-  box-shadow: var(--shadow);
+  box-shadow: 0 8px 18px rgba(31, 38, 35, 0.045);
 }
 
 .intake-panel {
@@ -132,7 +132,7 @@ h2 {
 .source-manager-panel,
 .sciverse-panel,
 .concept-panel {
-  padding: 18px;
+  padding: 16px;
 }
 
 .source-manager-panel {
@@ -140,6 +140,11 @@ h2 {
 }
 
 .source-manager-panel.is-highlighted {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(20, 104, 86, 0.12);
+}
+
+.workbench-panel.is-highlighted {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(20, 104, 86, 0.12);
 }
@@ -155,6 +160,8 @@ h2 {
 
 .workbench-panel {
   margin-bottom: 18px;
+  border-color: #bfd4cb;
+  box-shadow: 0 12px 28px rgba(24, 77, 68, 0.08);
 }
 
 .output-panel {
@@ -176,8 +183,12 @@ h2 {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
+}
+
+.concept-header-actions .icon-button {
+  flex: 0 0 auto;
 }
 
 .concept-header-actions .inline-action {
@@ -444,6 +455,15 @@ textarea:focus {
   background: var(--accent-soft);
 }
 
+.quiet-button {
+  color: #58605d;
+  background: transparent;
+}
+
+.rail-primary {
+  width: 100%;
+}
+
 .danger-button {
   padding: 0 14px;
   color: var(--danger);
@@ -513,6 +533,13 @@ textarea:focus {
 .domain-actions {
   display: flex;
   justify-content: flex-end;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.domain-item:hover .domain-actions,
+.domain-item:focus-within .domain-actions {
+  opacity: 1;
 }
 
 .domain-item.is-selected {
@@ -559,13 +586,13 @@ textarea:focus {
 .workbench-stats {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
   margin-bottom: 14px;
 }
 
 .stat-tile {
   min-width: 0;
-  padding: 10px;
+  padding: 8px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fbfcfb;
@@ -574,7 +601,7 @@ textarea:focus {
 .stat-value {
   display: block;
   color: var(--accent-strong);
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 800;
   line-height: 1.05;
 }
@@ -585,6 +612,122 @@ textarea:focus {
   color: var(--muted);
   font-size: 12px;
   font-weight: 700;
+}
+
+.next-step-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin: -2px 0 14px;
+  padding: 14px;
+  border: 1px solid #b8d3ca;
+  border-radius: 8px;
+  background: #eef7f3;
+}
+
+.next-step-panel strong,
+.next-step-panel span,
+.next-step-panel p {
+  display: block;
+}
+
+.next-step-kicker {
+  margin-bottom: 3px;
+  color: var(--accent-strong);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.next-step-panel strong {
+  font-size: 16px;
+}
+
+.next-step-panel p {
+  margin: 4px 0 0;
+  color: #4f5854;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.next-step-actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.workflow-guide {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfb;
+}
+
+.workflow-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.workflow-head strong {
+  font-size: 14px;
+}
+
+.workflow-head span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.workflow-steps {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.workflow-step {
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #fff;
+}
+
+.workflow-step.is-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.workflow-step strong,
+.workflow-step span {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.workflow-step strong {
+  font-size: 13px;
+}
+
+.workflow-step span {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.workbench-actions {
+  opacity: 0.45;
+  transition: opacity 120ms ease;
+}
+
+.workbench-panel:hover .workbench-actions,
+.workbench-panel:focus-within .workbench-actions {
+  opacity: 1;
 }
 
 .workbench-grid {
@@ -601,6 +744,65 @@ textarea:focus {
   border: 1px solid #cddfd8;
   border-radius: 8px;
   background: #f7fbf9;
+}
+
+.batch-result {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 14px;
+  padding: 12px;
+  border: 1px solid #d6ded8;
+  border-radius: 8px;
+  background: #fbfcfb;
+}
+
+.batch-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.batch-head strong,
+.batch-head span,
+.batch-row strong,
+.batch-row span {
+  display: block;
+}
+
+.batch-head span,
+.batch-row span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.batch-pill {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.batch-list {
+  display: grid;
+  gap: 7px;
+}
+
+.batch-row {
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #fff;
+}
+
+.batch-row strong {
+  overflow-wrap: anywhere;
+  font-size: 13px;
 }
 
 .organize-head {
@@ -737,15 +939,55 @@ textarea:focus {
   text-align: left;
 }
 
+.task-item.is-processing {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  opacity: 0.78;
+}
+
 .task-item.is-clickable:hover {
   border-color: var(--accent);
   background: var(--accent-soft);
+}
+
+.task-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .task-title {
   overflow-wrap: anywhere;
   font-size: 13px;
   font-weight: 750;
+}
+
+.task-title-link {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  color: var(--ink);
+  background: transparent;
+  text-align: left;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.task-title-link:hover {
+  color: var(--accent-strong);
+  text-decoration: underline;
+}
+
+.task-badge {
+  flex: 0 0 auto;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: 11px;
+  font-weight: 800;
 }
 
 .task-meta,
@@ -1127,14 +1369,14 @@ textarea:focus {
 }
 
 .graph-node text {
-  fill: #ffffff;
+  fill: #174d44;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 800;
   text-anchor: middle;
   pointer-events: none;
   paint-order: stroke;
-  stroke: rgba(23, 77, 68, 0.28);
-  stroke-width: 2px;
+  stroke: rgba(255, 255, 255, 0.88);
+  stroke-width: 3px;
 }
 
 .graph-detail {
@@ -1163,6 +1405,10 @@ textarea:focus {
 .graph-detail p {
   margin: 7px 0 0;
   line-height: 1.45;
+}
+
+.graph-detail-action {
+  margin-top: 9px;
 }
 
 .relation-table {
@@ -1208,6 +1454,32 @@ textarea:focus {
   grid-template-columns: 1fr;
   gap: 12px;
   margin-top: 12px;
+}
+
+.concept-editor {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid #bfd4cb;
+  border-radius: 8px;
+  background: #f3faf7;
+}
+
+.concept-editor.hidden {
+  display: none;
+}
+
+.concept-editor textarea {
+  min-height: 96px;
+}
+
+#conceptEditBody {
+  min-height: 220px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .concept-detail-panel .wiki-sidebar {
@@ -1582,6 +1854,10 @@ pre {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  .workflow-steps {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .workbench-grid {
     grid-template-columns: 1fr;
   }
@@ -1611,10 +1887,10 @@ pre {
     justify-content: stretch;
   }
 
-  .toolbar > *,
-  .actions > * {
-    flex: 1;
-  }
+.toolbar > *,
+.actions > * {
+  flex: 1;
+}
 
   .icon-button {
     flex: 0 0 42px;
@@ -1630,6 +1906,20 @@ pre {
 
   .workbench-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .workflow-head,
+  .next-step-panel {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .next-step-actions {
+    justify-content: stretch;
+  }
+
+  .next-step-actions > * {
+    flex: 1;
   }
 
   .organize-grid {

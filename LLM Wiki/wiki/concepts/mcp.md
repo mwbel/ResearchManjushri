@@ -3,9 +3,9 @@ title: MCP
 type: concept
 status: active
 created: 2026-06-17
-updated: 2026-06-17
-summary: 从资料《Agent Skills 终极指南：入门、精通、预测》自动提取的候选概念，等待人工整理定义、边界和跨学科连接。
-tags: [ai智能体, auto-concept]
+updated: 2026-06-24
+summary: MCP 是 ai智能体 知识网络中已保留的概念页，当前定义基于入库资料证据和概念关系，可继续精炼边界与跨学科连接。
+tags: [ai智能体, curated-concept]
 sources: [wiki/sources/2026-06-17-agent-skills-终极指南-入门-精通-预测.md]
 ---
 
@@ -26,10 +26,8 @@ sources: [wiki/sources/2026-06-17-agent-skills-终极指南-入门-精通-预测
 
 ## Open Questions
 
-- 这个概念是否应该保留为独立页面，还是并入更大的主题页？
-- 它和同学科其他概念的层级关系是什么？
-- 是否存在跨学科桥接价值？
-
+- 自动整理：已保留为独立概念页。
+- 后续可继续补充更精确的定义、边界、反例和跨学科连接。
 ## Related
 
 - [ai智能体 Knowledge Network](../domains/ai智能体.md)

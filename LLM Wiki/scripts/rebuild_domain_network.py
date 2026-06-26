@@ -17,13 +17,16 @@ DOMAINS = WIKI / "domains"
 DELETED_DOMAINS_FILE = ROOT / ".llm-wiki-deleted-domains.json"
 
 KNOWN_DOMAIN_LABELS = {
-    "general": "通用",
-    "llm-wiki": "LLM Wiki",
+    "ai": "ai",
+    "ai智能体": "ai智能体",
     "math": "数学",
+    "modern-astronomy": "现代天文学",
     "physics": "物理",
     "tibetan-astronomy-calendar": "西藏天文历算",
-    "modern-astronomy": "现代天文学",
+    "世界模型": "世界模型",
+    "垂直小模型": "垂直小模型",
 }
+AUTO_DISCOVER_DOMAINS = False
 
 
 def parse_frontmatter(path: Path) -> dict[str, str]:
@@ -85,7 +88,7 @@ def title_for(path: Path, meta: dict[str, str]) -> str:
 def discovered_domains() -> list[str]:
     deleted_domains = load_deleted_domains()
     domains = set(KNOWN_DOMAIN_LABELS) - deleted_domains
-    if RAW_SOURCES.exists():
+    if AUTO_DISCOVER_DOMAINS and RAW_SOURCES.exists():
         for path in RAW_SOURCES.iterdir():
             if path.is_dir() and not path.name.startswith("."):
                 domains.add(path.name)

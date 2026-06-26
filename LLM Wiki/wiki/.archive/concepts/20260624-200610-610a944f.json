@@ -1,0 +1,22 @@
+{
+  "id": "20260624-200610-610a944f",
+  "created_at": "2026-06-24T20:06:10",
+  "action": "merge",
+  "reason": "manual merge",
+  "label": "Skills",
+  "original_path": "wiki/concepts/skills.md",
+  "archived_path": "wiki/.archive/concepts/20260624-200610-610a944f-skills.md",
+  "domains": [
+    "ai智能体"
+  ],
+  "sources": [
+    "wiki/sources/2026-06-17-agent-skills-终极指南-入门-精通-预测.md"
+  ],
+  "extra": {
+    "target_path": "wiki/concepts/skill.md",
+    "target_title": "Skill",
+    "aliases_added": [
+      "Skills"
+    ]
+  }
+}

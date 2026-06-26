@@ -1,0 +1,16 @@
+{
+  "id": "20260624-200727-fb7a9b0b",
+  "created_at": "2026-06-24T20:07:27",
+  "action": "delete",
+  "reason": "manual decision: delete",
+  "label": "VS Code",
+  "original_path": "wiki/concepts/vs-code.md",
+  "archived_path": "wiki/.archive/concepts/20260624-200727-fb7a9b0b-vs-code.md",
+  "domains": [
+    "ai智能体"
+  ],
+  "sources": [
+    "wiki/sources/2026-06-17-agent-skills-终极指南-入门-精通-预测.md"
+  ],
+  "extra": {}
+}

@@ -82,6 +82,26 @@ CHINESE_TERM_PATTERN = re.compile(
 ENGLISH_TERM_PATTERN = re.compile(
     r"\b(?:[A-Z][A-Za-z0-9+-]{1,}|[A-Z]{2,})(?:[- ][A-Z][A-Za-z0-9+-]{1,}){0,3}\b"
 )
+RELATION_HINTS = (
+    ("依赖", "依赖"),
+    ("属于", "属于"),
+    ("组成", "组成"),
+    ("构成", "构成"),
+    ("导致", "导致"),
+    ("影响", "影响"),
+    ("促进", "促进"),
+    ("抑制", "抑制"),
+    ("提出", "提出"),
+    ("使用", "使用"),
+    ("基于", "基于"),
+    ("区别于", "区别于"),
+    ("对比", "对比"),
+    ("is a", "属于"),
+    ("depends on", "依赖"),
+    ("based on", "基于"),
+    ("uses", "使用"),
+    ("affects", "影响"),
+)
 
 
 def compact_spaces(value: object) -> str:
@@ -257,6 +277,69 @@ def extract_concept_candidates(clean_text: str, metadata: dict[str, Any]) -> dic
         if len(candidates) >= 10:
             break
     return {"concept_candidates": candidates}
+
+
+def relation_label(sentence: str) -> str:
+    lowered = sentence.lower()
+    for marker, label in RELATION_HINTS:
+        if marker.lower() in lowered:
+            return label
+    return "相关"
+
+
+def extract_relation_candidates(
+    clean_text: str,
+    metadata: dict[str, Any],
+    concepts: dict[str, Any],
+) -> dict[str, Any]:
+    candidates = [
+        item for item in concepts.get("concept_candidates") or []
+        if isinstance(item, dict) and compact_spaces(item.get("name"))
+    ]
+    candidate_rows = [
+        {
+            **candidate,
+            "candidate_id": compact_spaces(candidate.get("candidate_id")) or f"concept-{index + 1:03d}",
+        }
+        for index, candidate in enumerate(candidates)
+    ]
+    relations: list[dict[str, Any]] = []
+    seen: set[tuple[str, str, str]] = set()
+    for sentence in split_sentences(clean_text):
+        matches = [
+            candidate for candidate in candidate_rows
+            if compact_spaces(candidate.get("name")).lower() in sentence.lower()
+        ]
+        matches.sort(key=lambda item: sentence.lower().find(compact_spaces(item.get("name")).lower()))
+        if len(matches) < 2:
+            continue
+        label = relation_label(sentence)
+        for source, target in zip(matches, matches[1:]):
+            key = (source["candidate_id"], label, target["candidate_id"])
+            if key in seen or source["candidate_id"] == target["candidate_id"]:
+                continue
+            seen.add(key)
+            relations.append(
+                {
+                    "relation_id": f"relation-{len(relations) + 1:03d}",
+                    "source_candidate_id": source["candidate_id"],
+                    "source_name": compact_spaces(source.get("name")),
+                    "relation": label,
+                    "target_candidate_id": target["candidate_id"],
+                    "target_name": compact_spaces(target.get("name")),
+                    "evidence_quote": truncate(sentence, 240),
+                    "confidence": 0.72 if label != "相关" else 0.58,
+                }
+            )
+            if len(relations) >= 20:
+                return {
+                    "source_id": metadata.get("source_id") or "",
+                    "relation_candidates": relations,
+                }
+    return {
+        "source_id": metadata.get("source_id") or "",
+        "relation_candidates": relations,
+    }
 
 
 def quality_check(
