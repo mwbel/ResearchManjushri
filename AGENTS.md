@@ -2,9 +2,9 @@
 
 ## 项目目标
 
-本项目是个人研究资料与知识网络工作区。
+本项目仓库名为 `ResearchManjushri`，当前主产品名为 `LLM Wiki`。
 
-当前核心子项目是 `LLM Wiki/`：把微信文章、本地文档、论文、笔记等资料编译为可阅读、可追溯、可审核、可扩展的多学科 Markdown 知识网络。
+`LLM Wiki/` 是当前核心模块：把微信文章、本地文档、论文、笔记等资料编译为可阅读、可追溯、可审核、可扩展的多学科 Markdown 知识网络。
 
 核心链路：
 
@@ -48,11 +48,31 @@ Preflight Plan 至少包含：
 5. 准备运行的测试命令。
 6. 风险与回滚方式。
 
+## 任务执行清单规则
+
+根目录维护统一任务执行清单：
+
+```text
+任务执行清单_技术架构与开发进度.md
+```
+
+执行开发任务时必须保持清单同步：
+
+1. 新增模块、页面、接口、数据结构或后台能力时，先在任务执行清单中登记对应模块、子任务、状态、优先级和备注。
+2. 每完成一个模块或一个可独立验收的子任务，必须即时更新任务执行清单，把状态从 `未开始` 或 `进行中` 改为 `已完成`，并记录完成内容、影响范围和下一步。
+3. 如果任务被阻塞，必须把状态标记为 `阻塞`，并写清楚阻塞原因、需要的输入或依赖。
+4. 不要为同一个项目拆出多份重复清单；优先维护根目录这份统一清单。
+
 ## 项目结构
 
 根目录主要内容：
 
 - `LLM Wiki/`: 当前主要应用与知识库。
+- `services/`: 后续可独立运行或被多应用复用的服务模块。
+- `domains/`: 软件架构层面的业务领域边界说明。
+- `shared/`: 跨模块共享的数据结构、接口约定和通用说明。
+- `docs/api/`: LLM Wiki 对外接口契约。
+- `docs/architecture/`: 产品命名、模块边界和集成规范。
 - `inputs/`: 原始输入资料集合。
 - `outputs/`: 临时或手动产出。
 - `AI/`: AI 相关资料。
@@ -72,6 +92,10 @@ LLM Wiki/README.md
 ## LLM Wiki 当前定位
 
 `LLM Wiki/` 是知识编译系统。
+
+后续所有新增能力默认按模块化开发：先明确领域对象、接口输入输出、状态流转和错误处理，再接入前端 app、管理后台、后端服务或数据库。
+
+不同应用集成 LLM Wiki 能力时，优先通过 HTTP API、adapter 或 `services/` 中的可复用服务，不要绕过核心后端直接改写 `raw/`、`wiki/`。
 
 三层数据：
 
@@ -119,7 +143,7 @@ LLM Wiki/README.md
 常用启动命令：
 
 ```bash
-cd "/Users/Min369/Documents/同步空间/Manju/AIProjects/ResearchManjusi/LLM Wiki"
+cd "/Users/Min369/Documents/同步空间/Manju/AIProjects/ResearchManjushri/LLM Wiki"
 lsof -tiTCP:8765 -sTCP:LISTEN | xargs -r kill
 python3 scripts/wiki_web.py --host 127.0.0.1 --port 8765
 ```
@@ -184,7 +208,7 @@ open http://127.0.0.1:8765/
 常用检查命令：
 
 ```bash
-cd "/Users/Min369/Documents/同步空间/Manju/AIProjects/ResearchManjusi/LLM Wiki"
+cd "/Users/Min369/Documents/同步空间/Manju/AIProjects/ResearchManjushri/LLM Wiki"
 python3 -m py_compile scripts/wiki_web.py scripts/mvp_concept_reviews.py scripts/mvp_ingest_artifacts.py scripts/mvp_ingest_runner.py scripts/rebuild_domain_network.py
 node --check webui/app.js
 curl -I http://127.0.0.1:8765/

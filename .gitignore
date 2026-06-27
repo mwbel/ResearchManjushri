@@ -1,5 +1,6 @@
 # 系统文件
 .DS_Store
+**/.DS_Store
 Thumbs.db
 
 # 缓存与环境
@@ -44,11 +45,20 @@ temp/
 *.xlsx
 
 # 原始资料与输入
+AI/
+outputs/
 本质之探索/
 需读论文/
 inputs/
 LLM Wiki/raw/
-LLM Wiki/wiki/sources/
+LLM Wiki/wiki/
+
+# 个人规划与对话记录
+PRD_*.md
+任务执行清单_*.md
+提示词历史.md
+第*次-*.md
+LLM Wiki *.md
 
 # 模型与数据库
 models/
