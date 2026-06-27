@@ -50,14 +50,15 @@ outputs/
 本质之探索/
 需读论文/
 inputs/
-LLM Wiki/raw/
-LLM Wiki/wiki/
+app/llm-wiki/raw/
+app/llm-wiki/wiki/
 
 # 个人规划与对话记录
 PRD_*.md
 任务执行清单_*.md
 提示词历史.md
 第*次-*.md
+docs/sessions/
 LLM Wiki *.md
 
 # 模型与数据库

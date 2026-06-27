@@ -4,7 +4,17 @@
 
 本项目仓库名为 `ResearchManjushri`，当前主产品名为 `LLM Wiki`。
 
-`LLM Wiki/` 是当前核心模块：把微信文章、本地文档、论文、笔记等资料编译为可阅读、可追溯、可审核、可扩展的多学科 Markdown 知识网络。
+`app/llm-wiki/` 是当前核心模块：把微信文章、本地文档、论文、笔记等资料编译为可阅读、可追溯、可审核、可扩展的多学科 Markdown 知识网络。
+
+项目主名（对外统一入口）为 `LLM Wiki`。仓库名 `ResearchManjushri` 作为工程容器与持续交付命名，不作为应用启动入口和用户可见主标题。
+
+模块化边界默认约束：
+
+- `app/llm-wiki/`：核心知识编译实现（现有 MVP），继续承载 raw/wiki、scripts、webui。
+- `services/`：可独立运行、可复用的服务模块（如 source-ingest、concept-service、graph-service、review-service、model-gateway）。
+- `domains/`：软件架构层面的业务领域边界定义。
+- `shared/`：跨模块共享契约、命名、schema、错误码、响应格式。
+- `docs/api/`：对外/跨模块 REST HTTP 接口契约（作为对接前端 app、管理后台、数据库/离线任务的唯一入口规范）。
 
 核心链路：
 
@@ -50,10 +60,10 @@ Preflight Plan 至少包含：
 
 ## 任务执行清单规则
 
-根目录维护统一任务执行清单：
+`docs/` 维护统一任务执行清单：
 
 ```text
-任务执行清单_技术架构与开发进度.md
+docs/任务执行清单_技术架构与开发进度.md
 ```
 
 执行开发任务时必须保持清单同步：
@@ -61,18 +71,22 @@ Preflight Plan 至少包含：
 1. 新增模块、页面、接口、数据结构或后台能力时，先在任务执行清单中登记对应模块、子任务、状态、优先级和备注。
 2. 每完成一个模块或一个可独立验收的子任务，必须即时更新任务执行清单，把状态从 `未开始` 或 `进行中` 改为 `已完成`，并记录完成内容、影响范围和下一步。
 3. 如果任务被阻塞，必须把状态标记为 `阻塞`，并写清楚阻塞原因、需要的输入或依赖。
-4. 不要为同一个项目拆出多份重复清单；优先维护根目录这份统一清单。
+4. 不要为同一个项目拆出多份重复清单；优先维护 `docs/` 下这份统一清单。
 
 ## 项目结构
 
 根目录主要内容：
 
-- `LLM Wiki/`: 当前主要应用与知识库。
+- `app/llm-wiki/`: 当前主要应用与知识库。
 - `services/`: 后续可独立运行或被多应用复用的服务模块。
 - `domains/`: 软件架构层面的业务领域边界说明。
 - `shared/`: 跨模块共享的数据结构、接口约定和通用说明。
 - `docs/api/`: LLM Wiki 对外接口契约。
 - `docs/architecture/`: 产品命名、模块边界和集成规范。
+- `docs/PRD_研究智能助手.md`: 产品需求文档。
+- `docs/任务执行清单_技术架构与开发进度.md`: 统一任务执行清单。
+- `docs/提示词历史.md`: 对话提示词归档。
+- `docs/sessions/`: 每轮任务总结。
 - `inputs/`: 原始输入资料集合。
 - `outputs/`: 临时或手动产出。
 - `AI/`: AI 相关资料。
@@ -80,18 +94,18 @@ Preflight Plan 至少包含：
 - `需读论文/`: 待读论文与 PDF。
 - `.agents/skills/`: 项目内 agent skill。
 
-`LLM Wiki/` 内部规则更细，修改该目录前必须优先阅读：
+`app/llm-wiki/` 内部规则更细，修改该目录前必须优先阅读：
 
 ```text
-LLM Wiki/AGENTS.md
-LLM Wiki/README.md
+app/llm-wiki/AGENTS.md
+app/llm-wiki/README.md
 ```
 
-如果根目录规则与 `LLM Wiki/AGENTS.md` 冲突，处理 `LLM Wiki/` 内文件时以 `LLM Wiki/AGENTS.md` 的领域规则为准；但用户在当前对话里的最新明确指令优先级最高。
+如果根目录规则与 `app/llm-wiki/AGENTS.md` 冲突，处理 `app/llm-wiki/` 内文件时以 `app/llm-wiki/AGENTS.md` 的领域规则为准；但用户在当前对话里的最新明确指令优先级最高。
 
 ## LLM Wiki 当前定位
 
-`LLM Wiki/` 是知识编译系统。
+`app/llm-wiki/` 是知识编译系统。
 
 后续所有新增能力默认按模块化开发：先明确领域对象、接口输入输出、状态流转和错误处理，再接入前端 app、管理后台、后端服务或数据库。
 
@@ -99,20 +113,20 @@ LLM Wiki/README.md
 
 三层数据：
 
-1. `LLM Wiki/raw/`
+1. `app/llm-wiki/raw/`
    - 原始资料层。
    - `raw/sources/<domain>/<year>/` 存放 source stub。
    - `raw/assets/uploads/...` 存放上传附件。
    - 默认不要改写原始资料正文，除非用户明确要求。
 
-2. `LLM Wiki/wiki/`
+2. `app/llm-wiki/wiki/`
    - 长期知识层。
    - `wiki/sources/`: 每份资料的 source summary。
    - `wiki/concepts/`: 概念页。
    - `wiki/domains/`: 学科网络入口。
    - `wiki/analyses/`: 查询或专题分析沉淀。
 
-3. `LLM Wiki/scripts/` 与 `LLM Wiki/webui/`
+3. `app/llm-wiki/scripts/` 与 `app/llm-wiki/webui/`
    - `scripts/wiki_web.py`: 本地 HTTP 服务、API 与 Web UI 后端。
    - `webui/`: 前端页面。
    - `scripts/mvp_*`: MVP ingest、候选概念、review、projection 相关逻辑。
@@ -143,7 +157,7 @@ LLM Wiki/README.md
 常用启动命令：
 
 ```bash
-cd "/Users/Min369/Documents/同步空间/Manju/AIProjects/ResearchManjushri/LLM Wiki"
+cd "/Users/Min369/Documents/同步空间/Manju/AIProjects/ResearchManjushri/app/llm-wiki"
 lsof -tiTCP:8765 -sTCP:LISTEN | xargs -r kill
 python3 scripts/wiki_web.py --host 127.0.0.1 --port 8765
 ```
@@ -170,9 +184,23 @@ open http://127.0.0.1:8765/
 6. `raw/assets/uploads/` 中的上传原件
 7. 已归档的 `wiki/.archive/`
 8. `.DS_Store`
-9. 未跟踪但看起来是用户备份的文件，例如 `AGENTS_副本.md`、`LLM Wiki/AGENTS.md.bak`
+9. 未跟踪但看起来是用户备份的文件，例如 `AGENTS_副本.md`、`app/llm-wiki/AGENTS.md.bak`
 
 不要恢复、删除或覆盖用户已有未提交改动，除非用户明确要求。
+
+## 提交与推送边界（新增）
+
+默认规则：本仓库推送到 GitHub 时仅保留软件与技术文档资产，不推送书籍、论文、原始资料和个人资料。
+
+请将下面内容视为“禁止上云”边界（如已跟踪需先清理后再继续下一次提交）：
+
+- `inputs/`、`outputs/`、`AI/`、`本质之探索/`、`需读论文/`
+- `app/llm-wiki/raw/`、`app/llm-wiki/wiki/`
+- `*.pdf`、`*.docx`、`*.pptx`、`*.xlsx`、媒体大文件
+- `docs/sessions/第*次-*.md`、`docs/PRD_*.md`、`docs/任务执行清单_*.md`、`docs/提示词历史.md` 这类会话沉淀性内容（除非你明确要求）
+
+推送前建议执行仓库侧检查（见 `docs/architecture/push-policy.md`）；
+或启用本仓库 pre-push 钩子（见同文档），强制阻断违规文件提交。
 
 如果需要清理错误生成的资料、概念、学科或附件，必须先列出将删除的路径。
 
@@ -180,7 +208,7 @@ open http://127.0.0.1:8765/
 
 维护 wiki 时遵守：
 
-1. 先读 `LLM Wiki/wiki/00-meta/index.md` 或相关 domain page，理解已有结构。
+1. 先读 `app/llm-wiki/wiki/00-meta/index.md` 或相关 domain page，理解已有结构。
 2. 新结论要能追溯到 source。
 3. 概念页要尽量保留 `sources: [...]`。
 4. 不要把临时总结直接写入 raw source。
@@ -190,7 +218,7 @@ open http://127.0.0.1:8765/
 
 ## 前端与交互规则
 
-`LLM Wiki/webui/` 是工作台，不是营销页。
+`app/llm-wiki/webui/` 是工作台，不是营销页。
 
 设计原则：
 
@@ -208,7 +236,7 @@ open http://127.0.0.1:8765/
 常用检查命令：
 
 ```bash
-cd "/Users/Min369/Documents/同步空间/Manju/AIProjects/ResearchManjushri/LLM Wiki"
+cd "/Users/Min369/Documents/同步空间/Manju/AIProjects/ResearchManjushri/app/llm-wiki"
 python3 -m py_compile scripts/wiki_web.py scripts/mvp_concept_reviews.py scripts/mvp_ingest_artifacts.py scripts/mvp_ingest_runner.py scripts/rebuild_domain_network.py
 node --check webui/app.js
 curl -I http://127.0.0.1:8765/
@@ -271,25 +299,25 @@ git checkout -- .
 不要泛泛解释，不要把用户看不到的命令输出原样堆给用户。
 
 ## 提示词记录规范（新增）
-- 每次对话要求的提示词需归档到 `提示词历史.md`，格式为：时间、对话序号、提示词内容。
-- 每次还需新增一份单一汇总文档，文件名格式：`第N次-YYYYMMDDHHMM-任务重点-前端app-管理后台-后端-数据库.md`。
+- 每次对话要求的提示词需归档到 `docs/提示词历史.md`，格式为：时间、对话序号、提示词内容。
+- 每次还需在 `docs/sessions/` 新增一份单一汇总文档，文件名格式：`第N次-YYYYMMDDHHMM-任务重点-前端app-管理后台-后端-数据库.md`。
 - 汇总文档必须包含：本次任务重点、下一步行动、前端app/管理后台/后端/数据库各自下一步。
 - 同一轮只保留一份汇总文档，不可拆成四份独立 markdown。
 
 ## 提示词记录规范（新增）
-- 每次对话要求的提示词需归档到 `提示词历史.md`，格式为：时间、对话序号、提示词内容。
-- 每次还需新增一份单一汇总文档，文件名格式：`第N次-YYYYMMDDHHMM-任务重点（20字）-前端app-管理后台-后端-数据库.md`。
+- 每次对话要求的提示词需归档到 `docs/提示词历史.md`，格式为：时间、对话序号、提示词内容。
+- 每次还需在 `docs/sessions/` 新增一份单一汇总文档，文件名格式：`第N次-YYYYMMDDHHMM-任务重点（20字）-前端app-管理后台-后端-数据库.md`。
 - 汇总文档必须包含：本次任务重点、下一步行动、前端app/管理后台/后端/数据库各自下一步。
 - 同一轮只保留一份汇总文档，不可拆分为多份。
 
 ## 提示词记录规范（新增）
-- 每次对话要求的提示词需归档到 `提示词历史.md`，格式为：时间、对话序号、提示词内容。
-- 每次还需新增一份单一汇总文档，文件名格式：`第N次-YYYYMMDDHHMM-任务重点（20字）-前端app-管理后台-后端-数据库.md`。
+- 每次对话要求的提示词需归档到 `docs/提示词历史.md`，格式为：时间、对话序号、提示词内容。
+- 每次还需在 `docs/sessions/` 新增一份单一汇总文档，文件名格式：`第N次-YYYYMMDDHHMM-任务重点（20字）-前端app-管理后台-后端-数据库.md`。
 - 汇总文档必须包含：本次任务重点、下一步行动、前端app/管理后台/后端/数据库各自下一步。
 - 同一轮只保留一份汇总文档，不可拆分为多份。
 
 ## 提示词记录规范（新增）
-- 每次对话要求的提示词需归档到 提示词历史.md，格式为：时间、对话序号、提示词内容。
-- 每次还需新增一份单一汇总文档，文件名格式：第N次-YYYYMMDDHHMM-任务重点（20字）-前端app-管理后台-后端-数据库.md。
+- 每次对话要求的提示词需归档到 `docs/提示词历史.md`，格式为：时间、对话序号、提示词内容。
+- 每次还需在 `docs/sessions/` 新增一份单一汇总文档，文件名格式：`第N次-YYYYMMDDHHMM-任务重点（20字）-前端app-管理后台-后端-数据库.md`。
 - 汇总文档必须包含：本次任务重点、下一步行动、前端app/管理后台/后端/数据库各自下一步。
 - 同一轮只保留一份汇总文档，不可拆分为多份。

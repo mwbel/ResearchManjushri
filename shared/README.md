@@ -13,3 +13,8 @@
 - 前端 app 与管理后台共用的状态枚举。
 
 不要把某个页面专用逻辑放到这里。只有多个模块或多个应用都会用到的内容，才进入 `shared/`。
+
+当前标准入口：
+
+- API 契约：`docs/api/llm-wiki-api.md`
+- 共享响应规范：`shared/api-response.md`

@@ -2,7 +2,7 @@
 
 `domains/` 用于记录领域模块边界。
 
-领域模块不是 `LLM Wiki/wiki/domains/` 的替代品。这里描述软件架构里的业务领域；`LLM Wiki/wiki/domains/` 仍然是知识库里的学科页面。
+领域模块不是 `app/llm-wiki/wiki/domains/` 的替代品。这里描述软件架构里的业务领域；`app/llm-wiki/wiki/domains/` 仍然是知识库里的学科页面。
 
 建议领域：
 
@@ -19,3 +19,10 @@
 2. API 输入输出。
 3. 状态流转。
 4. 与前端 app、管理后台、后端、数据库的责任边界。
+
+建议与 API 契约联动的补充格式：
+
+- `request_schema`: 入参字段、字段类型、默认值
+- `response_schema`: 响应字段、错误场景
+- `state_machine`: 状态变化与可达边界
+- `api_owner`: 负责团队/接口联系人

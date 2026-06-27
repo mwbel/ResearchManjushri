@@ -13,12 +13,12 @@ Build a personal multi-disciplinary knowledge base on top of the existing LLM Wi
 
 ## Current Runtime
 
-- Project root: `/Users/Min369/Documents/同步空间/Manju/AIProjects/ResearchManjusi/LLM Wiki`
+- Project root: `/Users/Min369/Documents/同步空间/Manju/AIProjects/ResearchManjushri/app/llm-wiki`
 - Local UI: `http://127.0.0.1:8765/`
 - Start command:
 
 ```bash
-cd "/Users/Min369/Documents/同步空间/Manju/AIProjects/ResearchManjusi/LLM Wiki"
+cd "/Users/Min369/Documents/同步空间/Manju/AIProjects/ResearchManjushri/app/llm-wiki"
 python3 scripts/wiki_web.py --host 127.0.0.1 --port 8765
 ```
 

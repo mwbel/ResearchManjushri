@@ -1,0 +1,55 @@
+#!/usr/bin/env sh
+set -eu
+
+blocked_files=""
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  if [ -z "${local_sha}" ] || [ "${local_sha}" = "0000000000000000000000000000000000000000" ]; then
+    continue
+  fi
+
+  if [ -z "${remote_sha}" ] || [ "${remote_sha}" = "0000000000000000000000000000000000000000" ]; then
+    range="${local_sha}"
+  else
+    range="${remote_sha}..${local_sha}"
+  fi
+
+  if [ -z "${remote_sha}" ] || [ "${remote_sha}" = "0000000000000000000000000000000000000000" ]; then
+    names="$(git show --name-only --pretty=format: "${local_sha}")"
+  else
+    names="$(git diff --name-only "${range}")"
+  fi
+
+  while IFS= read -r file; do
+    [ -z "${file}" ] && continue
+
+    case "${file}" in
+      inputs/*|outputs/*|AI/*|"本质之探索"/*|"需读论文"/*|"app/llm-wiki/raw"/*|"app/llm-wiki/wiki"/*|\
+      docs/sessions/*|docs/PRD_*|docs/任务执行清单_*|docs/提示词历史.md|\
+      第*次-*|PRD_*|任务执行清单_*|提示词历史.md|*提示词历史.md)
+        blocked_files="${blocked_files}${file}\n"
+        ;;
+      *.pdf|*.caj|*.docx|*.pptx|*.xlsx|*.zip|*.tar|*.gz|*.mp4|*.mov|*.m4a|*.mp3|*.wav)
+        blocked_files="${blocked_files}${file}\n"
+        ;;
+      *) ;;
+    esac
+  done <<EOF_FILES
+${names}
+EOF_FILES
+done
+
+if [ -n "${blocked_files}" ]; then
+  printf '%s\n' "[push-scope-block] 检测到不应推送文件："
+  printf '%s' "${blocked_files}" | sed -n 's/^/[push-scope-block]  /p'
+  cat <<'MSG' >&2
+请先清理后重试。
+
+建议：
+1) 先创建新 commit，确保不含以下文件/目录；
+2) 或取消 push 并执行 git add/rm 后重新组织提交。
+MSG
+  exit 1
+fi
+
+exit 0
